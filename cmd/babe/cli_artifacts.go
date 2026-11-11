@@ -50,21 +50,43 @@ func handleToolsCLI(client *device.Client, pm platform.PlatformManager, args []s
 
 func handleUpdateCLI(client *device.Client, pm platform.PlatformManager, args []string) {
 	if len(args) == 0 {
-		ui.Warn("Specify update target:")
-		fmt.Println("  babe update tools       Install or update Google Android Platform-Tools (adb/fastboot)")
-		fmt.Println("  babe update self        Check for babe updates (or use --tools / --self)")
+		fmt.Println("Usage: babe update <tools|self> [-f|--force] [-c|--check]")
+		fmt.Println("\nTargets:")
+		fmt.Println("  tools, platform-tools   Install or update Google Android Platform-Tools (adb/fastboot)")
+		fmt.Println("  self, babe              Check and update babe executable to latest GitHub release")
+		fmt.Println("\nFlags:")
+		fmt.Println("  -f, --force             Force download/reinstall even if already up to date")
+		fmt.Println("  -c, --check             Check for updates without downloading")
 		os.Exit(1)
 	}
 
-	target := strings.ToLower(strings.TrimLeft(args[0], "-"))
+	fs := flag.NewFlagSet("update", flag.ExitOnError)
+	force := fs.Bool("f", false, "Force reinstall even if up to date")
+	fs.BoolVar(force, "force", false, "Force reinstall even if up to date")
+	check := fs.Bool("c", false, "Check for updates only")
+	fs.BoolVar(check, "check", false, "Check for updates only")
+	toolsFlag := fs.Bool("tools", false, "Update platform-tools")
+	selfFlag := fs.Bool("self", false, "Update babe executable")
+
+	boolFlags := map[string]bool{"-f": true, "--force": true, "-c": true, "--check": true, "--tools": true, "--self": true}
+	_ = fs.Parse(reorderFlags(args, boolFlags))
+
+	target := ""
+	if *toolsFlag {
+		target = "tools"
+	} else if *selfFlag {
+		target = "self"
+	} else if fs.NArg() > 0 {
+		target = strings.ToLower(strings.TrimLeft(fs.Arg(0), "-"))
+	}
+
 	switch target {
 	case "tools", "platform-tools", "adb", "fastboot":
 		downloadOrUpdatePlatformTools(client, pm)
 	case "self", "babe":
-		ui.Info("babe %s is currently installed.", version)
-		ui.Info("Self-update from GitHub Releases: https://github.com/A7E28/AndroidUtility/releases")
+		runSelfUpdate(*force, *check)
 	default:
-		ui.Error("Unknown update target %q (valid: tools, self)", args[0])
+		ui.Error("Unknown update target %q (valid: tools, self)", target)
 		os.Exit(1)
 	}
 }

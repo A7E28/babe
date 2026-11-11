@@ -13,7 +13,6 @@ import (
 )
 
 func TestExtractZip(t *testing.T) {
-	// Create a synthetic zip in memory
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
 

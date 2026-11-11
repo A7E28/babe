@@ -36,11 +36,12 @@ func runDoctorMenu(adbClient *device.Client, fbClient *fastboot.Client, pm platf
 }
 
 func platformToolsMenu(client *device.Client, pm platform.PlatformManager, reader *bufio.Reader) {
-	ui.Section("Platform-Tools Manager")
+	ui.Section("Platform-Tools & babe Updates")
 	ui.RenderMenuItem(1, "Check Installed Status & PATH")
 	ui.RenderMenuItem(2, "Download or Update Google Platform-Tools")
-	ui.RenderMenuItem(3, "Cancel")
-	ui.Prompt(fmt.Sprintf("\n%s ", ui.White("Enter choice [1-3]:")))
+	ui.RenderMenuItem(3, "Check & Update babe (Self-Update)")
+	ui.RenderMenuItem(4, "Cancel")
+	ui.Prompt(fmt.Sprintf("\n%s ", ui.White("Enter choice [1-4]:")))
 
 	input, _ := reader.ReadString('\n')
 	switch strings.TrimSpace(input) {
@@ -48,6 +49,8 @@ func platformToolsMenu(client *device.Client, pm platform.PlatformManager, reade
 		checkPlatformTools(client, pm)
 	case "2":
 		downloadOrUpdatePlatformTools(client, pm)
+	case "3":
+		runSelfUpdateInteractive(reader)
 	}
 }
 

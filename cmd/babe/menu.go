@@ -21,7 +21,7 @@ func runInteractiveMenu() {
 	for {
 		ui.RenderBanner(version)
 		ui.RenderMenuItem(1, "System & USB Doctor (Diagnostics & udev)")
-		ui.RenderMenuItem(2, "Platform-Tools Manager (Status / Install / Update)")
+		ui.RenderMenuItem(2, "Platform-Tools & babe Updates (Status / Install / Self-Update)")
 		ui.RenderMenuItem(3, "Device Telemetry & Reboot (ADB)")
 		ui.RenderMenuItem(4, "Fastboot & Slot A/B Manager")
 		ui.RenderMenuItem(5, "Logcat Stream & Crash Harvester")
