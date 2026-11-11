@@ -40,17 +40,21 @@ func platformToolsMenu(client *device.Client, pm platform.PlatformManager, reade
 	ui.RenderMenuItem(1, "Check Installed Status & PATH")
 	ui.RenderMenuItem(2, "Download or Update Google Platform-Tools")
 	ui.RenderMenuItem(3, "Check & Update babe (Self-Update)")
-	ui.RenderMenuItem(4, "Cancel")
-	ui.Prompt(fmt.Sprintf("\n%s ", ui.White("Enter choice [1-4]:")))
+	ui.RenderMenuItem(4, "Install babe to System PATH (Global Setup)")
+	ui.RenderMenuItem(5, "Cancel")
+	ui.Prompt(fmt.Sprintf("\n%s ", ui.White("Enter choice [1-5]:")))
 
 	input, _ := reader.ReadString('\n')
 	switch strings.TrimSpace(input) {
 	case "1":
 		checkPlatformTools(client, pm)
+		runBabeSetup(pm, false, true)
 	case "2":
 		downloadOrUpdatePlatformTools(client, pm)
 	case "3":
 		runSelfUpdateInteractive(reader)
+	case "4":
+		runBabeSetup(pm, false, false)
 	}
 }
 
