@@ -44,8 +44,16 @@ func RenderArchiveInfo(info *apk.ArchiveInfo, showAllPerms bool) {
 	if info.VersionName != "" || info.VersionCode > 0 {
 		fmt.Printf("  %s %s %s\n", Gray("Version:        "), White(info.VersionName), Gray(fmt.Sprintf("(code %d)", info.VersionCode)))
 	}
-	if info.MinSDK > 0 || info.TargetSDK > 0 {
-		fmt.Printf("  %s %s\n", Gray("SDK Levels:     "), White(fmt.Sprintf("minSdk %d / targetSdk %d", info.MinSDK, info.TargetSDK)))
+	if info.MinSDK > 0 || info.TargetSDK > 0 || info.MinSDKCodename != "" || info.TargetSDKCodename != "" {
+		minStr := fmt.Sprintf("%d", info.MinSDK)
+		if info.MinSDKCodename != "" {
+			minStr = info.MinSDKCodename
+		}
+		targetStr := fmt.Sprintf("%d", info.TargetSDK)
+		if info.TargetSDKCodename != "" {
+			targetStr = info.TargetSDKCodename
+		}
+		fmt.Printf("  %s %s\n", Gray("SDK Levels:     "), White(fmt.Sprintf("minSdk %s / targetSdk %s", minStr, targetStr)))
 	}
 	if len(info.ABIs) > 0 {
 		fmt.Printf("  %s %s\n", Gray("Native ABIs:    "), Cyan(strings.Join(info.ABIs, ", ")))

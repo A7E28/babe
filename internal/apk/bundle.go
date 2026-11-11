@@ -84,6 +84,55 @@ func InstallBundle(ctx context.Context, client *device.Client, serial, bundlePat
 	return nil
 }
 
+// PackSplitBundle packages multiple split APK files into a single .apks zip archive using Store compression.
+func PackSplitBundle(splitPaths []string, bundlePath string) error {
+	outFile, err := os.OpenFile(bundlePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	zw := zip.NewWriter(outFile)
+	buf := make([]byte, 64*1024)
+
+	for _, splitPath := range splitPaths {
+		if err := addFileToZip(zw, splitPath, buf); err != nil {
+			_ = zw.Close()
+			return err
+		}
+	}
+
+	return zw.Close()
+}
+
+func addFileToZip(zw *zip.Writer, filePath string, buf []byte) error {
+	src, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	fi, err := src.Stat()
+	if err != nil {
+		return err
+	}
+
+	hdr, err := zip.FileInfoHeader(fi)
+	if err != nil {
+		return err
+	}
+	hdr.Name = filepath.Base(filePath)
+	hdr.Method = zip.Store
+
+	w, err := zw.CreateHeader(hdr)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.CopyBuffer(w, src, buf)
+	return err
+}
+
 func extractZipEntry(f *zip.File, destPath string) error {
 	src, err := f.Open()
 	if err != nil {
