@@ -132,11 +132,52 @@ func RunDiagnostics(ctx context.Context, adbClient *device.Client, fbClient *fas
 		}
 	}
 
+	results = append(results, checkBabeCLIPath(pm, pathEnv))
+
 	results = append(results, checkOSUSBReadiness())
 
 	results = append(results, checkConnectedDevices(ctx, adbClient, fbClient))
 
 	return results
+}
+
+func checkBabeCLIPath(pm platform.PlatformManager, pathEnv string) CheckResult {
+	binDir, err := pm.GetBabeBinDir()
+	if err != nil {
+		return CheckResult{Name: "babe CLI Path", Status: StatusWarn, Summary: err.Error()}
+	}
+	binName := "babe"
+	if runtime.GOOS == "windows" {
+		binName = "babe.exe"
+	}
+	targetBin := filepath.Join(binDir, binName)
+	inPath, _ := pm.IsInPath(binDir)
+	_, statErr := os.Stat(targetBin)
+
+	if statErr != nil || !inPath {
+		return CheckResult{
+			Name:    "babe CLI Path",
+			Status:  StatusWarn,
+			Summary: fmt.Sprintf("babe is not installed globally in PATH (%s)", targetBin),
+			Remedy:  "Run 'babe setup' to install babe into your user PATH",
+		}
+	}
+
+	babeMatches := FindExecutablesInPath("babe", pathEnv)
+	if len(babeMatches) > 1 {
+		return CheckResult{
+			Name:    "babe CLI Path",
+			Status:  StatusWarn,
+			Summary: fmt.Sprintf("Configured (%s), but %d conflicting 'babe' binaries found in PATH", targetBin, len(babeMatches)),
+			Remedy:  fmt.Sprintf("Shadowed binary: %s — remove duplicate copies", babeMatches[1]),
+		}
+	}
+
+	return CheckResult{
+		Name:    "babe CLI Path",
+		Status:  StatusOK,
+		Summary: fmt.Sprintf("Configured (%s)", targetBin),
+	}
 }
 
 func checkOSUSBReadiness() CheckResult {
