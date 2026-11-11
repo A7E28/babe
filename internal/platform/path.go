@@ -33,9 +33,23 @@ func CleanPathString(pathStr string, delimiter rune) []string {
 	return cleaned
 }
 
-// joins path segments with the given delimiter.
+// FormatPathString joins path segments with the given delimiter.
 func FormatPathString(segments []string, delimiter rune) string {
 	return strings.Join(segments, string(delimiter))
+}
+
+// AppendPathSegment normalizes trailing delimiters on currentPath before appending dir.
+func AppendPathSegment(currentPath, dir string, delimiter rune) string {
+	delimStr := string(delimiter)
+	cleanCurrent := strings.TrimRight(strings.TrimSpace(currentPath), delimStr)
+	cleanDir := strings.TrimSpace(dir)
+	if cleanCurrent == "" {
+		return cleanDir
+	}
+	if cleanDir == "" {
+		return cleanCurrent
+	}
+	return cleanCurrent + delimStr + cleanDir
 }
 
 func normalizePathForCompare(p string) string {

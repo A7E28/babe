@@ -3,7 +3,7 @@
 package platform
 
 import (
-	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -89,10 +89,11 @@ func ensureShellRC(home, localBin string) {
 	currentPath := os.Getenv("PATH")
 	segments := CleanPathString(currentPath, ':')
 	if !ContainsPath(segments, localBin, false) {
-		if currentPath == "" {
+		cleanCurrent := strings.TrimLeft(strings.TrimSpace(currentPath), ":")
+		if cleanCurrent == "" {
 			_ = os.Setenv("PATH", localBin)
 		} else {
-			_ = os.Setenv("PATH", localBin+":"+currentPath)
+			_ = os.Setenv("PATH", localBin+":"+cleanCurrent)
 		}
 	}
 
@@ -156,34 +157,19 @@ func (l *linuxPlatformManager) RemoveFromPath(dir string) error {
 }
 
 func (l *linuxPlatformManager) OpenFilePicker(title string) (string, error) {
-	// Try zenity if available
 	if zenityPath, err := exec.LookPath("zenity"); err == nil {
 		cmd := exec.Command(zenityPath, "--file-selection", "--title="+title)
-		out, err := cmd.Output()
-		if err == nil {
+		if out, err := cmd.Output(); err == nil {
 			return strings.TrimSpace(string(out)), nil
 		}
 	}
 
-	// Try kdialog if available
 	if kdialogPath, err := exec.LookPath("kdialog"); err == nil {
 		cmd := exec.Command(kdialogPath, "--getopenfilename", ".", "", "--title", title)
-		out, err := cmd.Output()
-		if err == nil {
+		if out, err := cmd.Output(); err == nil {
 			return strings.TrimSpace(string(out)), nil
 		}
 	}
 
-	// Fallback to terminal input prompt
-	fmt.Printf("%s\nEnter file path: ", title)
-	reader := bufio.NewReader(os.Stdin)
-	text, err := reader.ReadString('\n')
-	if err != nil {
-		return "", err
-	}
-	clean := strings.TrimSpace(text)
-	if clean == "" {
-		return "", nil
-	}
-	return clean, nil
+	return "", errors.New("no graphical file dialog (zenity/kdialog) available")
 }
