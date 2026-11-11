@@ -4,8 +4,19 @@ A fast, standalone, cross-platform (Windows & Linux) Android Systems, Firmware, 
 
 ## Installation
 
+### Quick Install (Automatic PATH Setup)
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/A7E28/babe/main/install.ps1 | iex
+```
+
+**Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/A7E28/babe/main/install.sh | sh
+```
+
 ### Pre-built Binaries
-Download the latest executable for your operating system and architecture from the [Releases](https://github.com/A7E28/babe/releases) page.
+Download the latest executable for your operating system and architecture from the [Releases](https://github.com/A7E28/babe/releases) page, then run `./babe setup` to register it globally in your user `PATH`.
 
 ### Building from Source
 Requires Go 1.22 or later.
@@ -34,7 +45,7 @@ Run `babe` without arguments to launch the interactive TUI:
   babe v0.2.0
 ──────────────────────────────────────────────────
   [1]  System & USB Doctor (Diagnostics & udev)
-  [2]  Platform-Tools Manager (Status / Install / Update)
+  [2]  Platform-Tools & babe Updates (Status / Install / Self-Update)
   [3]  Device Telemetry & Reboot (ADB)
   [4]  Fastboot & Slot A/B Manager
   [5]  Logcat Stream & Crash Harvester
@@ -50,14 +61,15 @@ Enter choice [1-9]:
 Every interactive feature is available via structured, scriptable CLI subcommands (flags work before or after positional arguments):
 
 ```bash
-# System, PATH conflict & USB diagnostics
+# Global PATH setup, system diagnostics & udev
+babe setup [-f|--force] [-s|--status]    # Install babe globally into user PATH
 babe doctor
 sudo babe doctor --fix-udev              # Install/reload Linux Android udev rules
 
-# Manage Android SDK Platform-Tools (adb & fastboot)
+# Manage Android SDK Platform-Tools & Self-Update
 babe tools status
 babe tools update                        # Or: babe update tools / babe update --tools
-babe update self                         # Or: babe update --self
+babe update self [-f|--force] [-c]       # Or: babe update --self
 
 # Offline APK, Split-Bundle & Firmware Image Analysis (No device needed)
 babe apk inspect app.apk [-a|--all]      # Inspect binary AndroidManifest.xml, SDKs, ABIs, certs
