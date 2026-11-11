@@ -1,0 +1,17 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/babe
+/babe-linux
+/build.go.exe
+cmd/babe/babe
+
+# Test artifacts
+*.test
+*.out
+
+# Distribution directory
+dist/
