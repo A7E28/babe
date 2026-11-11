@@ -8,6 +8,7 @@ import (
 // defines the cross-platform operations for system path and UI dialogs.
 type PlatformManager interface {
 	GetDefaultInstallDir() (string, error)
+	GetBabeBinDir() (string, error)
 	IsInPath(dir string) (bool, error)
 	AddToPath(dir string) error
 	RemoveFromPath(dir string) error
@@ -37,15 +38,25 @@ func FormatPathString(segments []string, delimiter rune) string {
 	return strings.Join(segments, string(delimiter))
 }
 
+func normalizePathForCompare(p string) string {
+	trimmed := strings.TrimSpace(p)
+	if len(trimmed) > 1 {
+		trimmed = strings.TrimRight(trimmed, `\/`)
+	}
+	return trimmed
+}
+
 // checks if a path list contains a directory (case-insensitive on Windows).
 func ContainsPath(list []string, target string, caseInsensitive bool) bool {
+	normTarget := normalizePathForCompare(target)
 	for _, p := range list {
+		normP := normalizePathForCompare(p)
 		if caseInsensitive {
-			if strings.EqualFold(p, target) {
+			if strings.EqualFold(normP, normTarget) {
 				return true
 			}
 		} else {
-			if p == target {
+			if normP == normTarget {
 				return true
 			}
 		}
@@ -55,13 +66,15 @@ func ContainsPath(list []string, target string, caseInsensitive bool) bool {
 
 // removes a target directory from a slice of paths.
 func FilterOutPath(list []string, target string, caseInsensitive bool) []string {
+	normTarget := normalizePathForCompare(target)
 	var result []string
 	for _, p := range list {
+		normP := normalizePathForCompare(p)
 		match := false
 		if caseInsensitive {
-			match = strings.EqualFold(p, target)
+			match = strings.EqualFold(normP, normTarget)
 		} else {
-			match = (p == target)
+			match = (normP == normTarget)
 		}
 		if !match {
 			result = append(result, p)

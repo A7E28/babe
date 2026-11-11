@@ -30,7 +30,7 @@ func defaultManager() PlatformManager {
 	return &windowsPlatformManager{}
 }
 
-func (w *windowsPlatformManager) GetDefaultInstallDir() (string, error) {
+func resolveLocalAppData() (string, error) {
 	localAppData := os.Getenv("LOCALAPPDATA")
 	if localAppData == "" {
 		home, err := os.UserHomeDir()
@@ -39,7 +39,23 @@ func (w *windowsPlatformManager) GetDefaultInstallDir() (string, error) {
 		}
 		localAppData = filepath.Join(home, "AppData", "Local")
 	}
-	return filepath.Join(localAppData, "babe", "platform-tools"), nil
+	return localAppData, nil
+}
+
+func (w *windowsPlatformManager) GetDefaultInstallDir() (string, error) {
+	base, err := resolveLocalAppData()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(base, "babe", "platform-tools"), nil
+}
+
+func (w *windowsPlatformManager) GetBabeBinDir() (string, error) {
+	base, err := resolveLocalAppData()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(base, "babe", "bin"), nil
 }
 
 func (w *windowsPlatformManager) getRegistryPath() (string, uint32, error) {
@@ -109,6 +125,11 @@ func (w *windowsPlatformManager) AddToPath(dir string) error {
 
 	if err != nil {
 		return fmt.Errorf("write updated Path to registry: %w", err)
+	}
+
+	procPath := os.Getenv("PATH")
+	if !ContainsPath(CleanPathString(procPath, ';'), dir, true) {
+		_ = os.Setenv("PATH", procPath+";"+dir)
 	}
 
 	broadcastEnvironmentChange()
