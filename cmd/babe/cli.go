@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/A7E28/babe/internal/device"
 	"github.com/A7E28/babe/internal/fastboot"
@@ -107,20 +110,59 @@ func handleLogcatDomainCLI(client *device.Client, args []string) {
 		ui.Error("Unexpected logcat argument %q. Run 'babe help' for usage.", fs.Arg(0))
 		os.Exit(1)
 	}
-
 	parsedLevel, err := logcat.ValidateLevel(*level)
 	if err != nil {
 		ui.Error("%v", err)
 		os.Exit(1)
 	}
-
 	handleLogcatCLI(client, logcat.StreamOptions{
-		Serial:      *serial,
-		MinLevel:    parsedLevel,
-		TagFilter:   *tag,
-		PackageName: *pkg,
-		OutputFile:  *out,
+		Serial: *serial, MinLevel: parsedLevel, TagFilter: *tag, PackageName: *pkg, OutputFile: *out,
 	})
+}
+
+func handleLogcatCLI(client *device.Client, opts logcat.StreamOptions) {
+	targetSerial, err := resolveTargetDevice(client, opts.Serial)
+	if err != nil {
+		ui.Error("%v", err)
+		os.Exit(1)
+	}
+	opts.Serial = targetSerial
+	opts.ADBBinary = client.BinaryPath()
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	err = logcat.Stream(ctx, opts, func(entry logcat.Entry) {
+		fmt.Println(logcat.Colorize(entry))
+	})
+	if err != nil && ctx.Err() == nil {
+		ui.Error("Logcat stream error: %v", err)
+		os.Exit(1)
+	}
+}
+
+func handleCrashLogCLI(client *device.Client, serial, outFile string) {
+	targetSerial, err := resolveTargetDevice(client, serial)
+	if err != nil {
+		ui.Error("%v", err)
+		os.Exit(1)
+	}
+
+	count, err := logcat.DumpCrashLogs(context.Background(), client.BinaryPath(), targetSerial, outFile, func(entry logcat.Entry) {
+		fmt.Println(logcat.Colorize(entry))
+	})
+	if err != nil {
+		ui.Error("Crash log harvest failed: %v", err)
+		os.Exit(1)
+	}
+	if count == 0 {
+		ui.Info("No crash entries found in device crash buffer.")
+		return
+	}
+	ui.Info("Harvested %d crash log line(s) from device %s.", count, targetSerial)
+	if outFile != "" {
+		ui.Success("Saved crash report to %s", outFile)
+	}
 }
 
 func printHelp() {

@@ -14,7 +14,7 @@ import (
 	"github.com/A7E28/babe/internal/ui"
 )
 
-// moves flag tokens before positional arguments so flags work anywhere on the command line.
+// reorderFlags moves flag tokens before positional arguments so flags work anywhere on the command line.
 func reorderFlags(args []string, boolFlags map[string]bool) []string {
 	var flags, pos []string
 	for i := 0; i < len(args); i++ {
@@ -42,7 +42,7 @@ func handleToolsCLI(client *device.Client, pm platform.PlatformManager, args []s
 		checkPlatformTools(client, pm)
 		runBabeSetup(pm, false, true)
 	case "update", "install", "download":
-		downloadOrUpdatePlatformTools(client, pm)
+		downloadOrUpdatePlatformTools(client, pm, false, false)
 	case "setup":
 		runBabeSetup(pm, false, false)
 	default:
@@ -85,7 +85,7 @@ func handleUpdateCLI(client *device.Client, pm platform.PlatformManager, args []
 
 	switch target {
 	case "tools", "platform-tools", "adb", "fastboot":
-		downloadOrUpdatePlatformTools(client, pm)
+		downloadOrUpdatePlatformTools(client, pm, *force, *check)
 	case "self", "babe":
 		runSelfUpdate(*force, *check)
 	default:

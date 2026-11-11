@@ -103,12 +103,7 @@ func (w *windowsPlatformManager) AddToPath(dir string) error {
 		return err
 	}
 
-	var newPath string
-	if currentPath == "" {
-		newPath = dir
-	} else {
-		newPath = currentPath + ";" + dir
-	}
+	newPath := AppendPathSegment(currentPath, dir, ';')
 
 	k, err := registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.SET_VALUE)
 	if err != nil {
@@ -129,7 +124,7 @@ func (w *windowsPlatformManager) AddToPath(dir string) error {
 
 	procPath := os.Getenv("PATH")
 	if !ContainsPath(CleanPathString(procPath, ';'), dir, true) {
-		_ = os.Setenv("PATH", procPath+";"+dir)
+		_ = os.Setenv("PATH", AppendPathSegment(procPath, dir, ';'))
 	}
 
 	broadcastEnvironmentChange()

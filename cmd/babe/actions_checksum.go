@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"strings"
 
 	"github.com/A7E28/babe/internal/hash"
 	"github.com/A7E28/babe/internal/platform"
@@ -13,16 +12,8 @@ import (
 func checksumMenu(pm platform.PlatformManager, reader *bufio.Reader) {
 	ui.Section("Calculate File Checksum")
 
-	filePath, err := pm.OpenFilePicker("Select File for Checksum")
-	if err != nil {
-		ui.Warn("File dialog unavailable: %v", err)
-		ui.Prompt("Enter file path: ")
-		input, _ := reader.ReadString('\n')
-		filePath = strings.TrimSpace(input)
-	}
-
+	filePath := promptFileWithFallback(pm, reader, "Select File for Checksum")
 	if filePath == "" {
-		ui.Warn("No file selected.")
 		return
 	}
 

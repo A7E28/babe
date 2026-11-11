@@ -44,3 +44,23 @@ func TestFilterOutPath(t *testing.T) {
 		t.Errorf("got %v, want %v", filtered, expected)
 	}
 }
+
+func TestAppendPathSegment(t *testing.T) {
+	tests := []struct {
+		current string
+		dir     string
+		delim   rune
+		want    string
+	}{
+		{"", `C:\babe\bin`, ';', `C:\babe\bin`},
+		{`C:\Windows\System32`, `C:\babe\bin`, ';', `C:\Windows\System32;C:\babe\bin`},
+		{`C:\Windows\System32;`, `C:\babe\bin`, ';', `C:\Windows\System32;C:\babe\bin`},
+		{`C:\Windows\System32;;;  `, `C:\babe\bin`, ';', `C:\Windows\System32;C:\babe\bin`},
+	}
+
+	for _, tc := range tests {
+		if got := AppendPathSegment(tc.current, tc.dir, tc.delim); got != tc.want {
+			t.Errorf("AppendPathSegment(%q, %q) = %q, want %q", tc.current, tc.dir, got, tc.want)
+		}
+	}
+}

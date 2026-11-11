@@ -24,8 +24,11 @@ func runDoctorMenu(adbClient *device.Client, fbClient *fastboot.Client, pm platf
 
 	if runtime.GOOS == "linux" {
 		ui.Prompt(fmt.Sprintf("\n%s ", ui.White("Install/reload Linux Android USB udev rules now? [y/N]:")))
-		ans, _ := reader.ReadString('\n')
-		if strings.EqualFold(strings.TrimSpace(ans), "y") {
+		ans, ok := readLine(reader)
+		if !ok {
+			return
+		}
+		if strings.EqualFold(ans, "y") {
 			if err := platform.InstallUdevRules(); err != nil {
 				ui.Error("%v", err)
 			} else {
@@ -44,13 +47,16 @@ func platformToolsMenu(client *device.Client, pm platform.PlatformManager, reade
 	ui.RenderMenuItem(5, "Cancel")
 	ui.Prompt(fmt.Sprintf("\n%s ", ui.White("Enter choice [1-5]:")))
 
-	input, _ := reader.ReadString('\n')
-	switch strings.TrimSpace(input) {
+	input, ok := readLine(reader)
+	if !ok {
+		return
+	}
+	switch input {
 	case "1":
 		checkPlatformTools(client, pm)
 		runBabeSetup(pm, false, true)
 	case "2":
-		downloadOrUpdatePlatformTools(client, pm)
+		downloadOrUpdatePlatformTools(client, pm, false, false)
 	case "3":
 		runSelfUpdateInteractive(reader)
 	case "4":
@@ -74,7 +80,7 @@ func checkPlatformTools(client *device.Client, pm platform.PlatformManager) {
 	ui.RenderADBStatus(details.Installed, details.Version, details.BinaryPath, installDir, inPath)
 }
 
-func downloadOrUpdatePlatformTools(client *device.Client, pm platform.PlatformManager) {
+func downloadOrUpdatePlatformTools(client *device.Client, pm platform.PlatformManager, force, checkOnly bool) {
 	ui.Section("Download or Update Platform-Tools")
 	ctx := context.Background()
 
@@ -87,8 +93,25 @@ func downloadOrUpdatePlatformTools(client *device.Client, pm platform.PlatformMa
 	release, err := tools.FetchLatestRelease(netCtx)
 	cancelNet()
 
+	if checkOnly {
+		if err != nil {
+			ui.Error("Failed to check remote repository: %v", err)
+			return
+		}
+		if !details.Installed {
+			ui.Info("Platform-tools is not installed (latest available: v%s).", release.Version)
+			ui.Info("Run 'babe update tools' to download and configure.")
+		} else if tools.CompareVersions(details.Version, release.Version) < 0 {
+			ui.Info("Update available: v%s -> v%s", details.Version, release.Version)
+			ui.Info("Run 'babe update tools' to install.")
+		} else {
+			ui.Success("Platform-tools is up to date (v%s).", details.Version)
+		}
+		return
+	}
+
 	if err != nil {
-		if details.Installed {
+		if details.Installed && !force {
 			ui.Warn("Could not check remote repository: %v", err)
 			ui.Info("Platform-tools v%s is currently installed at:\n     %s", details.Version, details.BinaryPath)
 			return
@@ -97,7 +120,7 @@ func downloadOrUpdatePlatformTools(client *device.Client, pm platform.PlatformMa
 		fmt.Println("Attempting download from default repository mirror...")
 	}
 
-	if details.Installed && release != nil {
+	if details.Installed && release != nil && !force {
 		if tools.CompareVersions(details.Version, release.Version) >= 0 {
 			ui.Success("Platform-tools is already up to date: v%s", details.Version)
 			fmt.Printf("     Binary: %s\n", details.BinaryPath)
@@ -144,7 +167,7 @@ func selectDevice(client *device.Client, reader *bufio.Reader) (string, error) {
 		return "", fmt.Errorf("list devices: %w", err)
 	}
 	if len(devices) == 0 {
-		return "", fmt.Errorf("no connected ADB devices detected")
+		return "", device.ErrNoDevicesFound
 	}
 	if len(devices) == 1 {
 		if err := device.ValidateDeviceState(devices[0]); err != nil {
@@ -155,8 +178,11 @@ func selectDevice(client *device.Client, reader *bufio.Reader) (string, error) {
 
 	ui.RenderDeviceList(devices)
 	ui.Prompt(fmt.Sprintf("Select device [1-%d]: ", len(devices)))
-	input, _ := reader.ReadString('\n')
-	idx, err := strconv.Atoi(strings.TrimSpace(input))
+	input, ok := readLine(reader)
+	if !ok {
+		return "", fmt.Errorf("device selection cancelled")
+	}
+	idx, err := strconv.Atoi(input)
 	if err != nil || idx < 1 || idx > len(devices) {
 		return "", fmt.Errorf("invalid device selection")
 	}
@@ -165,78 +191,4 @@ func selectDevice(client *device.Client, reader *bufio.Reader) (string, error) {
 		return "", err
 	}
 	return selected.Serial, nil
-}
-
-func deviceMenu(client *device.Client, reader *bufio.Reader) {
-	ui.Section("Device Telemetry & Reboot")
-	ui.RenderMenuItem(1, "Inspect Hardware, OS & Battery Telemetry")
-	ui.RenderMenuItem(2, "List Attached ADB Devices")
-	ui.RenderMenuItem(3, "Reboot Device (System / Bootloader / Recovery / EDL)")
-	ui.RenderMenuItem(4, "Cancel")
-	ui.Prompt(fmt.Sprintf("\n%s ", ui.White("Enter choice [1-4]:")))
-
-	input, _ := reader.ReadString('\n')
-	switch strings.TrimSpace(input) {
-	case "1":
-		serial, err := selectDevice(client, reader)
-		if err != nil {
-			ui.Warn("%v", err)
-			return
-		}
-		info, err := client.GetDeviceInfo(context.Background(), serial)
-		if err != nil {
-			ui.Error("Querying device info: %v", err)
-			return
-		}
-		ui.RenderDeviceInfo(info)
-	case "2":
-		devs, err := client.GetConnectedDevices(context.Background())
-		if err != nil {
-			ui.Error("%v", err)
-			return
-		}
-		if len(devs) == 0 {
-			ui.Warn("No ADB devices attached.")
-			return
-		}
-		ui.RenderDeviceList(devs)
-	case "3":
-		rebootMenu(client, reader)
-	}
-}
-
-func rebootMenu(client *device.Client, reader *bufio.Reader) {
-	serial, err := selectDevice(client, reader)
-	if err != nil {
-		ui.Warn("%v", err)
-		return
-	}
-
-	ui.RenderMenuItem(1, "System")
-	ui.RenderMenuItem(2, "Bootloader (Fastboot)")
-	ui.RenderMenuItem(3, "Recovery")
-	ui.RenderMenuItem(4, "Qualcomm EDL")
-	ui.RenderMenuItem(5, "Cancel")
-	ui.Prompt(fmt.Sprintf("\n%s ", ui.White("Enter choice [1-5]:")))
-
-	input, _ := reader.ReadString('\n')
-	var target device.RebootTarget
-	switch strings.TrimSpace(input) {
-	case "1":
-		target = device.RebootSystem
-	case "2":
-		target = device.RebootBootloader
-	case "3":
-		target = device.RebootRecovery
-	case "4":
-		target = device.RebootEDL
-	default:
-		return
-	}
-
-	if err := client.Reboot(context.Background(), serial, target); err != nil {
-		ui.Error("%v", err)
-		return
-	}
-	ui.Success("Reboot command dispatched to device %s.", serial)
 }

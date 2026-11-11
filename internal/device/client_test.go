@@ -1,6 +1,7 @@
 package device
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -80,10 +81,13 @@ func TestValidateDeviceState(t *testing.T) {
 	if err := ValidateDeviceState(Device{Serial: "S1", State: StateDevice}); err != nil {
 		t.Errorf("expected nil error for StateDevice, got %v", err)
 	}
-	if err := ValidateDeviceState(Device{Serial: "S2", State: StateUnauthorized}); err == nil {
-		t.Errorf("expected error for StateUnauthorized, got nil")
+	if err := ValidateDeviceState(Device{Serial: "S2", State: StateUnauthorized}); !errors.Is(err, ErrDeviceUnauthorized) {
+		t.Errorf("expected ErrDeviceUnauthorized for StateUnauthorized, got %v", err)
 	}
-	if err := ValidateDeviceState(Device{Serial: "S3", State: StateOffline}); err == nil {
-		t.Errorf("expected error for StateOffline, got nil")
+	if err := ValidateDeviceState(Device{Serial: "S3", State: StateOffline}); !errors.Is(err, ErrDeviceOffline) {
+		t.Errorf("expected ErrDeviceOffline for StateOffline, got %v", err)
+	}
+	if err := ValidateDeviceState(Device{Serial: "S4", State: StateRecovery}); !errors.Is(err, ErrDeviceNotReady) {
+		t.Errorf("expected ErrDeviceNotReady for StateRecovery, got %v", err)
 	}
 }

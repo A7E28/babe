@@ -2,12 +2,21 @@ package device
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 )
 
-// holds parsed device telemetry and hardware information.
+var (
+	ErrDeviceUnauthorized = errors.New("unauthorized: accept the USB debugging prompt on the device screen")
+	ErrDeviceOffline      = errors.New("offline: reconnect USB cable or run 'adb reconnect'")
+	ErrDeviceNotReady     = errors.New("not ready for standard ADB commands")
+	ErrNoDevicesFound     = errors.New("no connected ADB devices detected")
+	ErrDeviceNotFound     = errors.New("target ADB device not found")
+)
+
+// Info holds parsed device telemetry and hardware information.
 type Info struct {
 	Serial          string
 	Model           string
@@ -23,21 +32,21 @@ type Info struct {
 	IsRooted        bool
 }
 
-// checks if an attached device is ready to accept ADB commands.
+// ValidateDeviceState checks if an attached device is ready to accept ADB commands.
 func ValidateDeviceState(d Device) error {
 	switch d.State {
 	case StateDevice:
 		return nil
 	case StateUnauthorized:
-		return fmt.Errorf("device %s is unauthorized: accept the USB debugging prompt on the device screen", d.Serial)
+		return fmt.Errorf("device %s is %w", d.Serial, ErrDeviceUnauthorized)
 	case StateOffline:
-		return fmt.Errorf("device %s is offline: reconnect USB cable or run 'adb reconnect'", d.Serial)
+		return fmt.Errorf("device %s is %w", d.Serial, ErrDeviceOffline)
 	default:
-		return fmt.Errorf("device %s is in %q state and not ready for standard ADB commands", d.Serial, d.State)
+		return fmt.Errorf("device %s is in %q state (%w)", d.Serial, d.State, ErrDeviceNotReady)
 	}
 }
 
-// queries a device for comprehensive hardware and OS properties.
+// GetDeviceInfo queries a device for comprehensive hardware and OS properties.
 func (c *Client) GetDeviceInfo(ctx context.Context, serial string) (*Info, error) {
 	info := &Info{Serial: serial}
 
@@ -66,15 +75,13 @@ func (c *Client) GetDeviceInfo(ctx context.Context, serial string) (*Info, error
 		for _, line := range strings.Split(batteryOut, "\n") {
 			line = strings.TrimSpace(line)
 			if strings.HasPrefix(line, "level:") {
-				parts := strings.SplitN(line, ":", 2)
-				if len(parts) == 2 {
+				if parts := strings.SplitN(line, ":", 2); len(parts) == 2 {
 					if lvl, err := strconv.Atoi(strings.TrimSpace(parts[1])); err == nil {
 						info.BatteryLevel = lvl
 					}
 				}
 			} else if strings.HasPrefix(line, "status:") {
-				parts := strings.SplitN(line, ":", 2)
-				if len(parts) == 2 {
+				if parts := strings.SplitN(line, ":", 2); len(parts) == 2 {
 					st := strings.TrimSpace(parts[1])
 					if st == "2" || st == "5" {
 						info.BatteryCharging = true
@@ -94,9 +101,7 @@ func (c *Client) GetDeviceInfo(ctx context.Context, serial string) (*Info, error
 
 func parseGetprop(output string) map[string]string {
 	props := make(map[string]string)
-	lines := strings.Split(output, "\n")
-
-	for _, line := range lines {
+	for _, line := range strings.Split(output, "\n") {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "[") && strings.Contains(line, "]: [") {
 			parts := strings.SplitN(line, "]: [", 2)
@@ -107,7 +112,6 @@ func parseGetprop(output string) map[string]string {
 			}
 		}
 	}
-
 	return props
 }
 
@@ -120,17 +124,15 @@ const (
 	RebootEDL        RebootTarget = "edl"
 )
 
-// triggers a system or special mode restart on the device.
+// Reboot triggers a system or special mode restart on the device.
 func (c *Client) Reboot(ctx context.Context, serial string, target RebootTarget) error {
 	args := []string{"reboot"}
 	if target != RebootSystem {
 		args = append(args, string(target))
 	}
 
-	_, err := c.ExecuteOnDevice(ctx, serial, args...)
-	if err != nil {
+	if _, err := c.ExecuteOnDevice(ctx, serial, args...); err != nil {
 		return fmt.Errorf("reboot target %s: %w", target, err)
 	}
-
 	return nil
 }
