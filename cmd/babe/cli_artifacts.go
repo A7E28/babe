@@ -40,10 +40,13 @@ func handleToolsCLI(client *device.Client, pm platform.PlatformManager, args []s
 	switch sub {
 	case "status", "check":
 		checkPlatformTools(client, pm)
+		runBabeSetup(pm, false, true)
 	case "update", "install", "download":
 		downloadOrUpdatePlatformTools(client, pm)
+	case "setup":
+		runBabeSetup(pm, false, false)
 	default:
-		ui.Error("Unknown tools subcommand %q (valid: status, update)", sub)
+		ui.Error("Unknown tools subcommand %q (valid: status, update, setup)", sub)
 		os.Exit(1)
 	}
 }

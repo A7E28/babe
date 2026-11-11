@@ -3,14 +3,85 @@ package main
 import (
 	"bufio"
 	"context"
+	"flag"
 	"fmt"
 	"runtime"
 	"strings"
 	"time"
 
+	"github.com/A7E28/babe/internal/platform"
 	"github.com/A7E28/babe/internal/tools"
 	"github.com/A7E28/babe/internal/ui"
 )
+
+func handleSetupCLI(pm platform.PlatformManager, args []string) {
+	fs := flag.NewFlagSet("setup", flag.ExitOnError)
+	force := fs.Bool("f", false, "Force overwrite canonical binary")
+	fs.BoolVar(force, "force", false, "Force overwrite canonical binary")
+	statusOnly := fs.Bool("s", false, "Check setup status without modifying system")
+	fs.BoolVar(statusOnly, "status", false, "Check setup status without modifying system")
+
+	boolFlags := map[string]bool{"-f": true, "--force": true, "-s": true, "--status": true}
+	_ = fs.Parse(reorderFlags(args, boolFlags))
+
+	if fs.NArg() > 0 && strings.EqualFold(fs.Arg(0), "status") {
+		*statusOnly = true
+	}
+
+	runBabeSetup(pm, *force, *statusOnly)
+}
+
+func runBabeSetup(pm platform.PlatformManager, force, statusOnly bool) {
+	ui.Section("babe Environment Setup")
+
+	if statusOnly {
+		status, err := tools.GetBabeInstallStatus(pm)
+		if err != nil {
+			ui.Error("Failed to inspect installation status: %v", err)
+			return
+		}
+		fmt.Printf("  %-18s %s\n", ui.Gray("Running Binary:"), status.CurrentExecutable)
+		fmt.Printf("  %-18s %s\n", ui.Gray("Canonical Path:"), status.CanonicalBinPath)
+		if status.BinaryInstalled && status.UpToDate {
+			ui.Success("Canonical binary is installed and matches running version.")
+		} else if status.BinaryInstalled {
+			ui.Warn("Canonical binary exists but differs from running binary (run 'babe setup' to sync).")
+		} else {
+			ui.Warn("babe is not yet installed in canonical directory.")
+		}
+		if status.InPath {
+			ui.Success("Directory %s is registered in user PATH.", status.CanonicalBinDir)
+		} else {
+			ui.Warn("Directory %s is not in user PATH (run 'babe setup').", status.CanonicalBinDir)
+		}
+		return
+	}
+
+	res, err := tools.SetupBabe(pm, force)
+	if err != nil {
+		ui.Error("Setup failed: %v", err)
+		return
+	}
+
+	if res.AlreadyInstalled && res.PathAlreadySet {
+		ui.Success("babe is already installed and configured in PATH.")
+		ui.Info("Location: %s", res.TargetBinPath)
+		return
+	}
+
+	if res.BinaryUpdated {
+		ui.Success("Installed babe binary to: %s", res.TargetBinPath)
+	} else {
+		ui.Info("Binary already up to date at: %s", res.TargetBinPath)
+	}
+
+	if !res.PathAlreadySet && res.PathConfigured {
+		ui.Success("Registered %s in user PATH.", res.TargetBinDir)
+		ui.Info("Open a new terminal window to invoke 'babe' directly from any directory.")
+	} else if res.PathAlreadySet {
+		ui.Success("User PATH already contains %s.", res.TargetBinDir)
+	}
+}
 
 func runSelfUpdate(force, checkOnly bool) {
 	ui.Section("babe Self-Update")

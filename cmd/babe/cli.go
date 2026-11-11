@@ -32,6 +32,8 @@ func handleCLI(args []string) {
 		handleToolsCLI(adbClient, pm, rest)
 	case "update":
 		handleUpdateCLI(adbClient, pm, rest)
+	case "setup":
+		handleSetupCLI(pm, rest)
 	case "device", "devices":
 		if cmd == "devices" && len(rest) == 0 {
 			handleDeviceListCLI(adbClient)
@@ -47,6 +49,10 @@ func handleCLI(args []string) {
 	case "apk":
 		handleAPKDomainCLI(adbClient, rest)
 	case "install":
+		if len(rest) == 0 || strings.EqualFold(rest[0], "self") || strings.EqualFold(rest[0], "babe") || strings.HasPrefix(rest[0], "-") {
+			handleSetupCLI(pm, rest)
+			return
+		}
 		handleAPKDomainCLI(adbClient, append([]string{"install"}, rest...))
 	case "packages", "pkgs":
 		handleAPKDomainCLI(adbClient, append([]string{"list"}, rest...))
@@ -121,9 +127,10 @@ func printHelp() {
 	fmt.Printf("%s %s\n\n", ui.BoldCyan("babe"), ui.Gray(version))
 	fmt.Println(ui.White("Usage:"))
 	fmt.Println("  babe                                      Launch interactive terminal menu")
+	fmt.Println("  babe setup [-f|--force] [-s|--status]     Install babe globally into user PATH")
 	fmt.Println("  babe doctor [--fix-udev]                  Run system, PATH conflict & USB diagnostics")
 	fmt.Println("  babe tools <status|update>                Manage Android SDK platform-tools (adb/fastboot)")
-	fmt.Println("  babe update <tools|self> [--tools|--self] Explicitly update platform-tools or babe")
+	fmt.Println("  babe update <tools|self> [-f] [-c]        Update platform-tools or babe executable")
 	fmt.Println()
 	fmt.Println(ui.White("Device & Fastboot Commands:"))
 	fmt.Println("  babe device list                          List attached ADB devices")
