@@ -1,6 +1,7 @@
 package logcat
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -104,5 +105,21 @@ func TestColorize_RespectsNoColor(t *testing.T) {
 	out := Colorize(entry)
 	if strings.Contains(out, "\x1b[") {
 		t.Errorf("expected no ANSI escape sequences when NO_COLOR is set, got %q", out)
+	}
+}
+
+func TestStream_ReportsSubprocessError(t *testing.T) {
+	// Invoke `go` with an invalid subcommand so the subprocess starts and exits non-zero with 0 stdout lines.
+	err := Stream(context.Background(), StreamOptions{
+		ADBBinary: "go",
+		Serial:    "nonexistent",
+	}, nil)
+	if err == nil {
+		t.Errorf("expected Stream to return an error when subprocess exits non-zero, got nil")
+	}
+
+	_, crashErr := DumpCrashLogs(context.Background(), "go", "nonexistent", "", nil)
+	if crashErr == nil {
+		t.Errorf("expected DumpCrashLogs to return an error when subprocess exits non-zero, got nil")
 	}
 }
