@@ -5,14 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 
 	"github.com/A7E28/babe/internal/device"
 	"github.com/A7E28/babe/internal/doctor"
 	"github.com/A7E28/babe/internal/fastboot"
-	"github.com/A7E28/babe/internal/logcat"
 	"github.com/A7E28/babe/internal/platform"
 	"github.com/A7E28/babe/internal/ui"
 )
@@ -32,11 +29,11 @@ func resolveTargetDevice(client *device.Client, explicitSerial string) (string, 
 				return d.Serial, nil
 			}
 		}
-		return explicitSerial, nil
+		return "", fmt.Errorf("device %q: %w", explicitSerial, device.ErrDeviceNotFound)
 	}
 
 	if len(devices) == 0 {
-		return "", fmt.Errorf("no connected ADB devices detected")
+		return "", device.ErrNoDevicesFound
 	}
 	if len(devices) == 1 {
 		if err := device.ValidateDeviceState(devices[0]); err != nil {
@@ -50,15 +47,20 @@ func resolveTargetDevice(client *device.Client, explicitSerial string) (string, 
 }
 
 func resolveFastbootDevice(fbClient *fastboot.Client, explicitSerial string) (string, error) {
-	if explicitSerial != "" {
-		return explicitSerial, nil
-	}
 	devs, err := fbClient.GetConnectedDevices(context.Background())
 	if err != nil {
 		return "", fmt.Errorf("list fastboot devices: %w", err)
 	}
+	if explicitSerial != "" {
+		for _, d := range devs {
+			if d.Serial == explicitSerial {
+				return d.Serial, nil
+			}
+		}
+		return "", fmt.Errorf("fastboot device %q: %w", explicitSerial, fastboot.ErrFastbootNotFound)
+	}
 	if len(devs) == 0 {
-		return "", fmt.Errorf("no devices detected in Fastboot mode")
+		return "", fastboot.ErrNoFastbootDevices
 	}
 	if len(devs) == 1 {
 		return devs[0].Serial, nil
@@ -165,51 +167,6 @@ func handleRebootCLI(client *device.Client, targetStr, serial string) {
 		os.Exit(1)
 	}
 	ui.Success("Reboot command sent to device %s.", targetSerial)
-}
-
-func handleLogcatCLI(client *device.Client, opts logcat.StreamOptions) {
-	targetSerial, err := resolveTargetDevice(client, opts.Serial)
-	if err != nil {
-		ui.Error("%v", err)
-		os.Exit(1)
-	}
-	opts.Serial = targetSerial
-	opts.ADBBinary = client.BinaryPath()
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	err = logcat.Stream(ctx, opts, func(entry logcat.Entry) {
-		fmt.Println(logcat.Colorize(entry))
-	})
-	if err != nil && ctx.Err() == nil {
-		ui.Error("Logcat stream error: %v", err)
-		os.Exit(1)
-	}
-}
-
-func handleCrashLogCLI(client *device.Client, serial, outFile string) {
-	targetSerial, err := resolveTargetDevice(client, serial)
-	if err != nil {
-		ui.Error("%v", err)
-		os.Exit(1)
-	}
-
-	count, err := logcat.DumpCrashLogs(context.Background(), client.BinaryPath(), targetSerial, outFile, func(entry logcat.Entry) {
-		fmt.Println(logcat.Colorize(entry))
-	})
-	if err != nil {
-		ui.Error("Crash log harvest failed: %v", err)
-		os.Exit(1)
-	}
-	if count == 0 {
-		ui.Info("No crash entries found in device crash buffer.")
-		return
-	}
-	ui.Info("Harvested %d crash log line(s) from device %s.", count, targetSerial)
-	if outFile != "" {
-		ui.Success("Saved crash report to %s", outFile)
-	}
 }
 
 func handleUdevCLI() {

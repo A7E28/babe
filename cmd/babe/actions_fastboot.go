@@ -19,7 +19,7 @@ func selectFastbootDevice(fbClient *fastboot.Client, reader *bufio.Reader) (stri
 		return "", fmt.Errorf("list fastboot devices: %w", err)
 	}
 	if len(devices) == 0 {
-		return "", fmt.Errorf("no devices detected in Fastboot mode")
+		return "", fastboot.ErrNoFastbootDevices
 	}
 	if len(devices) == 1 {
 		return devices[0].Serial, nil
@@ -27,8 +27,11 @@ func selectFastbootDevice(fbClient *fastboot.Client, reader *bufio.Reader) (stri
 
 	ui.RenderFastbootDevices(devices)
 	ui.Prompt(fmt.Sprintf("Select fastboot device [1-%d]: ", len(devices)))
-	input, _ := reader.ReadString('\n')
-	idx, err := strconv.Atoi(strings.TrimSpace(input))
+	input, ok := readLine(reader)
+	if !ok {
+		return "", fmt.Errorf("fastboot device selection cancelled")
+	}
+	idx, err := strconv.Atoi(input)
 	if err != nil || idx < 1 || idx > len(devices) {
 		return "", fmt.Errorf("invalid fastboot device selection")
 	}
@@ -45,8 +48,11 @@ func fastbootMenu(fbClient *fastboot.Client, pm platform.PlatformManager, reader
 	ui.RenderMenuItem(6, "Cancel")
 	ui.Prompt(fmt.Sprintf("\n%s ", ui.White("Enter choice [1-6]:")))
 
-	choiceStr, _ := reader.ReadString('\n')
-	switch strings.TrimSpace(choiceStr) {
+	choiceStr, ok := readLine(reader)
+	if !ok {
+		return
+	}
+	switch choiceStr {
 	case "1":
 		devs, err := fbClient.GetConnectedDevices(context.Background())
 		if err != nil {
@@ -77,8 +83,10 @@ func fastbootMenu(fbClient *fastboot.Client, pm platform.PlatformManager, reader
 			return
 		}
 		ui.Prompt(fmt.Sprintf("%s ", ui.White("Target slot [a/b]:")))
-		slotInput, _ := reader.ReadString('\n')
-		slot := strings.TrimSpace(slotInput)
+		slot, ok := readLine(reader)
+		if !ok {
+			return
+		}
 		if err := fbClient.SetActiveSlot(context.Background(), serial, slot); err != nil {
 			ui.Error("%v", err)
 			return
@@ -91,8 +99,10 @@ func fastbootMenu(fbClient *fastboot.Client, pm platform.PlatformManager, reader
 			return
 		}
 		ui.Prompt(fmt.Sprintf("%s ", ui.White("Target partition name (e.g. boot, init_boot, recovery):")))
-		partInput, _ := reader.ReadString('\n')
-		partition := strings.TrimSpace(partInput)
+		partition, ok := readLine(reader)
+		if !ok {
+			return
+		}
 		if partition == "" {
 			ui.Warn("Partition name is required.")
 			return
@@ -145,8 +155,11 @@ func promptFileWithFallback(pm platform.PlatformManager, reader *bufio.Reader, t
 	if err != nil {
 		ui.Warn("File dialog unavailable: %v", err)
 		ui.Prompt("Enter file path: ")
-		input, _ := reader.ReadString('\n')
-		filePath = strings.TrimSpace(input)
+		input, ok := readLine(reader)
+		if !ok {
+			return ""
+		}
+		filePath = input
 	}
 	if filePath == "" {
 		ui.Warn("No file selected.")

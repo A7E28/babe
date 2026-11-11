@@ -124,18 +124,14 @@ func runSelfUpdate(force, checkOnly bool) {
 	expectedSHA := ""
 	if err != nil {
 		ui.Warn("Could not fetch release checksums: %v", err)
-	} else {
-		expectedSHA = checksums[asset.Name]
-		if expectedSHA != "" {
-			ui.Info("Verified SHA256: %s", expectedSHA)
-		}
+	} else if expectedSHA = checksums[asset.Name]; expectedSHA != "" {
+		ui.Info("Verified SHA256: %s", expectedSHA)
 	}
 
 	var lastPct int64 = -1
 	appliedPath, err := tools.ApplyBabeUpdate(ctx, asset, expectedSHA, func(cur, tot int64) {
 		if tot > 0 {
-			pct := (cur * 100) / tot
-			if pct != lastPct {
+			if pct := (cur * 100) / tot; pct != lastPct {
 				lastPct = pct
 				fmt.Printf("\rDownloading: %3d%% [%d / %d KB]", pct, cur/1024, tot/1024)
 			}
@@ -178,17 +174,16 @@ func runSelfUpdateInteractive(reader *bufio.Reader) {
 	if cmp >= 0 && version != "dev" {
 		ui.Success("babe is already up to date: %s", version)
 		ui.Prompt(fmt.Sprintf("\n%s ", ui.White("Force reinstall latest release anyway? [y/N]:")))
-		ans, _ := reader.ReadString('\n')
-		if !strings.EqualFold(strings.TrimSpace(ans), "y") {
+		ans, ok := readLine(reader)
+		if !ok || !strings.EqualFold(ans, "y") {
 			return
 		}
 		force = true
 	} else {
 		ui.Info("Current version: %s -> Latest version: %s (%s)", version, release.TagName, asset.Name)
 		ui.Prompt(fmt.Sprintf("\n%s ", ui.White("Download and install this update now? [Y/n]:")))
-		ans, _ := reader.ReadString('\n')
-		ans = strings.TrimSpace(ans)
-		if ans != "" && !strings.EqualFold(ans, "y") {
+		ans, ok := readLine(reader)
+		if !ok || (ans != "" && !strings.EqualFold(ans, "y")) {
 			return
 		}
 	}

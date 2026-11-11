@@ -12,6 +12,15 @@ import (
 	"github.com/A7E28/babe/internal/ui"
 )
 
+// readLine reads a single line from reader, returning false on EOF with no buffered data.
+func readLine(reader *bufio.Reader) (string, bool) {
+	line, err := reader.ReadString('\n')
+	if err != nil && len(line) == 0 {
+		return "", false
+	}
+	return strings.TrimSpace(line), true
+}
+
 func runInteractiveMenu() {
 	reader := bufio.NewReader(os.Stdin)
 	pm := platform.DefaultManager()
@@ -31,12 +40,11 @@ func runInteractiveMenu() {
 		ui.RenderMenuItem(9, "Exit")
 		ui.Prompt(fmt.Sprintf("\n%s ", ui.White("Enter choice [1-9]:")))
 
-		choiceStr, err := reader.ReadString('\n')
-		if err != nil && len(choiceStr) == 0 {
+		choice, ok := readLine(reader)
+		if !ok {
 			fmt.Printf("\n%s\n", ui.Gray("Exiting babe."))
 			return
 		}
-		choice := strings.TrimSpace(choiceStr)
 
 		switch choice {
 		case "1":
@@ -63,7 +71,7 @@ func runInteractiveMenu() {
 		}
 
 		ui.Prompt(fmt.Sprintf("\n%s", ui.Gray("Press Enter to continue...")))
-		if _, err := reader.ReadString('\n'); err != nil {
+		if _, ok := readLine(reader); !ok {
 			fmt.Printf("\n%s\n", ui.Gray("Exiting babe."))
 			return
 		}
