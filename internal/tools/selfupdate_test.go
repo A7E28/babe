@@ -62,3 +62,56 @@ ce8c47af65151d083ad6ac4b919631e522610274cf7765bccc315eb4ebdbf9a9  babe-v0.2.0-wi
 		t.Errorf("expected %s, got %s", expected, got)
 	}
 }
+
+type mockPlatformManager struct {
+	binDir string
+	inPath bool
+}
+
+func (m *mockPlatformManager) GetDefaultInstallDir() (string, error) { return m.binDir, nil }
+func (m *mockPlatformManager) GetBabeBinDir() (string, error)        { return m.binDir, nil }
+func (m *mockPlatformManager) IsInPath(dir string) (bool, error)     { return m.inPath, nil }
+func (m *mockPlatformManager) AddToPath(dir string) error {
+	m.inPath = true
+	return nil
+}
+func (m *mockPlatformManager) RemoveFromPath(dir string) error        { m.inPath = false; return nil }
+func (m *mockPlatformManager) OpenFilePicker(t string) (string, error) { return "", nil }
+
+func TestSetupBabe_Idempotent(t *testing.T) {
+	tmpDir := t.TempDir()
+	pm := &mockPlatformManager{binDir: tmpDir, inPath: false}
+
+	// First run: should install binary and configure PATH
+	res1, err := SetupBabe(pm, false)
+	if err != nil {
+		t.Fatalf("first SetupBabe failed: %v", err)
+	}
+	if !res1.BinaryUpdated || res1.AlreadyInstalled {
+		t.Errorf("expected first run to update binary, got %+v", res1)
+	}
+	if !res1.PathConfigured || res1.PathAlreadySet {
+		t.Errorf("expected first run to configure PATH, got %+v", res1)
+	}
+
+	// Second run: should detect binary is already up-to-date and in PATH
+	res2, err := SetupBabe(pm, false)
+	if err != nil {
+		t.Fatalf("second SetupBabe failed: %v", err)
+	}
+	if !res2.AlreadyInstalled || res2.BinaryUpdated {
+		t.Errorf("expected second run to detect AlreadyInstalled, got %+v", res2)
+	}
+	if !res2.PathAlreadySet {
+		t.Errorf("expected second run to detect PathAlreadySet, got %+v", res2)
+	}
+
+	// Third run with force=true: should overwrite binary
+	res3, err := SetupBabe(pm, true)
+	if err != nil {
+		t.Fatalf("forced SetupBabe failed: %v", err)
+	}
+	if !res3.BinaryUpdated {
+		t.Errorf("expected forced run to update binary, got %+v", res3)
+	}
+}
