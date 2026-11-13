@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"flag"
 	"fmt"
 	"runtime"
 	"strings"
@@ -13,28 +12,6 @@ import (
 	"github.com/A7E28/babe/internal/tools"
 	"github.com/A7E28/babe/internal/ui"
 )
-
-func handleSetupCLI(pm platform.PlatformManager, args []string) {
-	if len(args) > 0 && isHelpArg(args[0]) {
-		printSetupHelp()
-		return
-	}
-	fs := flag.NewFlagSet("setup", flag.ExitOnError)
-	fs.Usage = printSetupHelp
-	force := fs.Bool("f", false, "Force overwrite canonical binary")
-	fs.BoolVar(force, "force", false, "Force overwrite canonical binary")
-	statusOnly := fs.Bool("s", false, "Check setup status without modifying system")
-	fs.BoolVar(statusOnly, "status", false, "Check setup status without modifying system")
-
-	boolFlags := map[string]bool{"-f": true, "--force": true, "-s": true, "--status": true}
-	_ = fs.Parse(reorderFlags(args, boolFlags))
-
-	if fs.NArg() > 0 && strings.EqualFold(fs.Arg(0), "status") {
-		*statusOnly = true
-	}
-
-	runBabeSetup(pm, *force, *statusOnly)
-}
 
 func runBabeSetup(pm platform.PlatformManager, force, statusOnly bool) {
 	ui.Section("babe Environment Setup")
