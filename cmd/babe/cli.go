@@ -27,7 +27,12 @@ func handleCLI(args []string) {
 	case "version", "-v", "--version":
 		fmt.Printf("babe %s\n", version)
 	case "doctor":
+		if len(rest) > 0 && isHelpArg(rest[0]) {
+			printDoctorHelp()
+			return
+		}
 		fs := flag.NewFlagSet("doctor", flag.ExitOnError)
+		fs.Usage = printDoctorHelp
 		fixUdev := fs.Bool("fix-udev", false, "Install/reload Linux Android USB udev rules")
 		_ = fs.Parse(reorderFlags(rest, map[string]bool{"--fix-udev": true, "-fix-udev": true}))
 		handleDoctorCLI(adbClient, fbClient, pm, *fixUdev)
@@ -67,13 +72,21 @@ func handleCLI(args []string) {
 		handleLogcatDomainCLI(adbClient, rest)
 	case "hash":
 		if len(rest) < 1 {
-			fmt.Println("Usage: babe hash <file-path>")
+			printHashHelp()
 			os.Exit(1)
+		}
+		if isHelpArg(rest[0]) {
+			printHashHelp()
+			return
 		}
 		printFileHashes(rest[0])
 	case "udev":
 		handleUdevCLI()
 	case "help", "-h", "--help":
+		if len(rest) > 0 {
+			handleHelpCommand(rest)
+			return
+		}
 		printHelp()
 	default:
 		ui.Error("Unknown command %q. Run 'babe help' for usage.", cmd)
@@ -82,8 +95,17 @@ func handleCLI(args []string) {
 }
 
 func handleLogcatDomainCLI(client *device.Client, args []string) {
+	if len(args) > 0 && isHelpArg(args[0]) {
+		printLogcatHelp()
+		return
+	}
 	if len(args) > 0 && strings.EqualFold(args[0], "crash") {
+		if len(args) > 1 && isHelpArg(args[1]) {
+			printLogcatCrashHelp()
+			return
+		}
 		fs := flag.NewFlagSet("logcat crash", flag.ExitOnError)
+		fs.Usage = printLogcatCrashHelp
 		serial := fs.String("s", "", "Device serial")
 		fs.StringVar(serial, "serial", "", "Device serial")
 		out := fs.String("o", "", "Output file path")
@@ -94,6 +116,7 @@ func handleLogcatDomainCLI(client *device.Client, args []string) {
 	}
 
 	fs := flag.NewFlagSet("logcat", flag.ExitOnError)
+	fs.Usage = printLogcatHelp
 	serial := fs.String("s", "", "Device serial")
 	fs.StringVar(serial, "serial", "", "Device serial")
 	level := fs.String("v", "V", "Log level")
@@ -107,12 +130,12 @@ func handleLogcatDomainCLI(client *device.Client, args []string) {
 	_ = fs.Parse(reorderFlags(args, nil))
 
 	if fs.NArg() > 0 {
-		ui.Error("Unexpected logcat argument %q. Run 'babe help' for usage.", fs.Arg(0))
+		ui.Error("Unexpected logcat argument %q. Run 'babe logcat --help' for usage.", fs.Arg(0))
 		os.Exit(1)
 	}
 	parsedLevel, err := logcat.ValidateLevel(*level)
 	if err != nil {
-		ui.Error("%v", err)
+		ui.Error("%v. Valid levels: V, D, I, W, E, F.", err)
 		os.Exit(1)
 	}
 	handleLogcatCLI(client, logcat.StreamOptions{
@@ -152,44 +175,15 @@ func handleCrashLogCLI(client *device.Client, serial, outFile string) {
 		fmt.Println(logcat.Colorize(entry))
 	})
 	if err != nil {
-		ui.Error("Crash log harvest failed: %v", err)
+		ui.Error("Crash log dump failed: %v", err)
 		os.Exit(1)
 	}
 	if count == 0 {
 		ui.Info("No crash entries found in device crash buffer.")
 		return
 	}
-	ui.Info("Harvested %d crash log line(s) from device %s.", count, targetSerial)
+	ui.Info("Dumped %d crash log line(s) from device %s.", count, targetSerial)
 	if outFile != "" {
 		ui.Success("Saved crash report to %s", outFile)
 	}
-}
-
-func printHelp() {
-	fmt.Printf("%s %s\n\n", ui.BoldCyan("babe"), ui.Gray(version))
-	fmt.Println(ui.White("Usage:"))
-	fmt.Println("  babe                                      Launch interactive terminal menu")
-	fmt.Println("  babe setup [-f|--force] [-s|--status]     Install babe globally into user PATH")
-	fmt.Println("  babe doctor [--fix-udev]                  Run system, PATH conflict & USB diagnostics")
-	fmt.Println("  babe tools <status|update>                Manage Android SDK platform-tools (adb/fastboot)")
-	fmt.Println("  babe update <tools|self> [-f] [-c]        Update platform-tools or babe executable")
-	fmt.Println()
-	fmt.Println(ui.White("Device & Fastboot Commands:"))
-	fmt.Println("  babe device list                          List attached ADB devices")
-	fmt.Println("  babe device info [-s <serial>]            Display hardware, OS, battery & root telemetry")
-	fmt.Println("  babe device reboot [mode] [-s <serial>]   Reboot: system, bootloader, recovery, edl")
-	fmt.Println("  babe fastboot devices                     List devices in Fastboot/Bootloader mode")
-	fmt.Println("  babe fastboot info [-s <serial>]          Inspect bootloader lock, slot & variables")
-	fmt.Println("  babe fastboot slot <a|b> [-s <serial>]    Switch active A/B boot slot")
-	fmt.Println("  babe fastboot flash <part> <img> [-s ser] Hash-verified partition flash")
-	fmt.Println()
-	fmt.Println(ui.White("APK, Firmware Image & Forensics Commands:"))
-	fmt.Println("  babe apk inspect <file> [-a|--all]        Offline manifest, SDK, ABI & cert analysis")
-	fmt.Println("  babe apk install <file.apk|.apks> [-s s]  Install standard APK or Split APK bundle")
-	fmt.Println("  babe apk list [-3] [-f <str>] [-s <ser>]  List installed packages on device")
-	fmt.Println("  babe apk pull <pkg> [-o <dir>] [-s <ser>] Extract installed package APK from device")
-	fmt.Println("  babe image inspect <boot.img>             Offline boot.img / init_boot.img header parser")
-	fmt.Println("  babe logcat [flags]                       Stream real-time colored logcat")
-	fmt.Println("  babe logcat crash [-o <file>] [-s <ser>]  Harvest native tombstone & crash buffer")
-	fmt.Println("  babe hash <file-path>                     Single-pass MD5, SHA1 & SHA256 file hashes")
 }

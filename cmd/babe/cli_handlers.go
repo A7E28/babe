@@ -94,6 +94,10 @@ func handleDeviceListCLI(client *device.Client) {
 }
 
 func handleDeviceDomainCLI(client *device.Client, args []string) {
+	if len(args) > 0 && isHelpArg(args[0]) {
+		printDeviceHelp()
+		return
+	}
 	sub := "list"
 	var rest []string
 	if len(args) > 0 {
@@ -105,13 +109,23 @@ func handleDeviceDomainCLI(client *device.Client, args []string) {
 	case "list", "ls":
 		handleDeviceListCLI(client)
 	case "info":
+		if len(rest) > 0 && isHelpArg(rest[0]) {
+			printDeviceInfoHelp()
+			return
+		}
 		fs := flag.NewFlagSet("device info", flag.ExitOnError)
+		fs.Usage = printDeviceInfoHelp
 		serial := fs.String("s", "", "Device serial")
 		fs.StringVar(serial, "serial", "", "Device serial")
 		_ = fs.Parse(reorderFlags(rest, nil))
 		handleDeviceInfoCLI(client, *serial)
 	case "reboot":
+		if len(rest) > 0 && isHelpArg(rest[0]) {
+			printDeviceRebootHelp()
+			return
+		}
 		fs := flag.NewFlagSet("device reboot", flag.ExitOnError)
+		fs.Usage = printDeviceRebootHelp
 		serial := fs.String("s", "", "Device serial")
 		fs.StringVar(serial, "serial", "", "Device serial")
 		_ = fs.Parse(reorderFlags(rest, nil))
@@ -121,7 +135,7 @@ func handleDeviceDomainCLI(client *device.Client, args []string) {
 		}
 		handleRebootCLI(client, target, *serial)
 	default:
-		ui.Error("Unknown device subcommand %q (valid: list, info, reboot)", sub)
+		ui.Error("Unknown device subcommand %q. Run 'babe device --help' for usage.", sub)
 		os.Exit(1)
 	}
 }

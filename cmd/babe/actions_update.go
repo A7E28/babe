@@ -15,7 +15,12 @@ import (
 )
 
 func handleSetupCLI(pm platform.PlatformManager, args []string) {
+	if len(args) > 0 && isHelpArg(args[0]) {
+		printSetupHelp()
+		return
+	}
 	fs := flag.NewFlagSet("setup", flag.ExitOnError)
+	fs.Usage = printSetupHelp
 	force := fs.Bool("f", false, "Force overwrite canonical binary")
 	fs.BoolVar(force, "force", false, "Force overwrite canonical binary")
 	statusOnly := fs.Bool("s", false, "Check setup status without modifying system")

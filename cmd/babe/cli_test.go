@@ -33,3 +33,53 @@ func TestReadLine_HandlesEOF(t *testing.T) {
 		t.Errorf("expected (\"\", false) on subsequent read after EOF, got (%q, %v)", line, ok)
 	}
 }
+
+func TestIsHelpArg(t *testing.T) {
+	cases := []struct {
+		arg  string
+		want bool
+	}{
+		{"-h", true},
+		{"--help", true},
+		{"help", true},
+		{"-help", true},
+		{"status", false},
+		{"list", false},
+		{"-v", false},
+		{"--version", false},
+	}
+	for _, tc := range cases {
+		if got := isHelpArg(tc.arg); got != tc.want {
+			t.Errorf("isHelpArg(%q) = %v, want %v", tc.arg, got, tc.want)
+		}
+	}
+}
+
+func TestHelpSubcommands_DoNotPanic(t *testing.T) {
+	cmds := [][]string{
+		{},
+		{"doctor"},
+		{"tools"},
+		{"update"},
+		{"setup"},
+		{"device"},
+		{"device", "info"},
+		{"device", "reboot"},
+		{"fastboot"},
+		{"fastboot", "slot"},
+		{"fastboot", "flash"},
+		{"apk"},
+		{"apk", "inspect"},
+		{"apk", "install"},
+		{"apk", "list"},
+		{"apk", "pull"},
+		{"image"},
+		{"logcat"},
+		{"logcat", "crash"},
+		{"hash"},
+		{"unknown-subcommand"},
+	}
+	for _, c := range cmds {
+		handleHelpCommand(c)
+	}
+}

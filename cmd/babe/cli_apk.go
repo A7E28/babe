@@ -14,20 +14,29 @@ import (
 
 func handleAPKDomainCLI(client *device.Client, args []string) {
 	if len(args) == 0 {
-		fmt.Println("Usage: babe apk <inspect|install|list|pull> [args]")
+		printAPKHelp()
 		os.Exit(1)
+	}
+	if isHelpArg(args[0]) {
+		printAPKHelp()
+		return
 	}
 	sub := strings.ToLower(args[0])
 	rest := args[1:]
 
 	switch sub {
 	case "inspect", "info":
+		if len(rest) > 0 && isHelpArg(rest[0]) {
+			printAPKInspectHelp()
+			return
+		}
 		fs := flag.NewFlagSet("apk inspect", flag.ExitOnError)
+		fs.Usage = printAPKInspectHelp
 		showAll := fs.Bool("a", false, "Show all declared permissions")
 		fs.BoolVar(showAll, "all", false, "Show all declared permissions")
 		_ = fs.Parse(reorderFlags(rest, map[string]bool{"-a": true, "--a": true, "-all": true, "--all": true}))
 		if fs.NArg() < 1 {
-			fmt.Println("Usage: babe apk inspect <file.apk|.apks|.xapk> [-a|--all]")
+			printAPKInspectHelp()
 			os.Exit(1)
 		}
 		info, err := apk.InspectArchive(fs.Arg(0))
@@ -37,17 +46,27 @@ func handleAPKDomainCLI(client *device.Client, args []string) {
 		}
 		ui.RenderArchiveInfo(info, *showAll)
 	case "install":
+		if len(rest) > 0 && isHelpArg(rest[0]) {
+			printAPKInstallHelp()
+			return
+		}
 		fs := flag.NewFlagSet("apk install", flag.ExitOnError)
+		fs.Usage = printAPKInstallHelp
 		serial := fs.String("s", "", "Device serial")
 		fs.StringVar(serial, "serial", "", "Device serial")
 		_ = fs.Parse(reorderFlags(rest, nil))
 		if fs.NArg() < 1 {
-			fmt.Println("Usage: babe apk install <file.apk|.apks|.xapk> [-s <serial>]")
+			printAPKInstallHelp()
 			os.Exit(1)
 		}
 		handleInstallCLI(client, fs.Arg(0), *serial)
 	case "list", "ls":
+		if len(rest) > 0 && isHelpArg(rest[0]) {
+			printAPKListHelp()
+			return
+		}
 		fs := flag.NewFlagSet("apk list", flag.ExitOnError)
+		fs.Usage = printAPKListHelp
 		serial := fs.String("s", "", "Device serial")
 		fs.StringVar(serial, "serial", "", "Device serial")
 		thirdParty := fs.Bool("3", false, "Third-party packages only")
@@ -56,19 +75,24 @@ func handleAPKDomainCLI(client *device.Client, args []string) {
 		_ = fs.Parse(reorderFlags(rest, map[string]bool{"-3": true, "--3": true}))
 		handlePackagesCLI(client, *serial, *thirdParty, *filter)
 	case "pull":
+		if len(rest) > 0 && isHelpArg(rest[0]) {
+			printAPKPullHelp()
+			return
+		}
 		fs := flag.NewFlagSet("apk pull", flag.ExitOnError)
+		fs.Usage = printAPKPullHelp
 		serial := fs.String("s", "", "Device serial")
 		fs.StringVar(serial, "serial", "", "Device serial")
 		outDir := fs.String("o", ".", "Destination directory")
 		fs.StringVar(outDir, "output", ".", "Destination directory")
 		_ = fs.Parse(reorderFlags(rest, nil))
 		if fs.NArg() < 1 {
-			fmt.Println("Usage: babe apk pull <package-name> [-o <dir>] [-s <serial>]")
+			printAPKPullHelp()
 			os.Exit(1)
 		}
 		handlePullAPKCLI(client, fs.Arg(0), *outDir, *serial)
 	default:
-		ui.Error("Unknown apk subcommand %q (valid: inspect, install, list, pull)", sub)
+		ui.Error("Unknown apk subcommand %q. Run 'babe apk --help' for usage.", sub)
 		os.Exit(1)
 	}
 }

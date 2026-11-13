@@ -14,25 +14,11 @@ import (
 	"github.com/A7E28/babe/internal/ui"
 )
 
-// reorderFlags moves flag tokens before positional arguments so flags work anywhere on the command line.
-func reorderFlags(args []string, boolFlags map[string]bool) []string {
-	var flags, pos []string
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if strings.HasPrefix(arg, "-") {
-			flags = append(flags, arg)
-			if !strings.Contains(arg, "=") && !boolFlags[arg] && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				flags = append(flags, args[i+1])
-				i++
-			}
-		} else {
-			pos = append(pos, arg)
-		}
-	}
-	return append(flags, pos...)
-}
-
 func handleToolsCLI(client *device.Client, pm platform.PlatformManager, args []string) {
+	if len(args) > 0 && isHelpArg(args[0]) {
+		printToolsHelp()
+		return
+	}
 	sub := "status"
 	if len(args) > 0 {
 		sub = strings.ToLower(args[0])
@@ -46,31 +32,28 @@ func handleToolsCLI(client *device.Client, pm platform.PlatformManager, args []s
 	case "setup":
 		runBabeSetup(pm, false, false)
 	default:
-		ui.Error("Unknown tools subcommand %q (valid: status, update, setup)", sub)
+		ui.Error("Unknown tools subcommand %q. Run 'babe tools --help' for usage.", sub)
 		os.Exit(1)
 	}
 }
 
 func handleUpdateCLI(client *device.Client, pm platform.PlatformManager, args []string) {
 	if len(args) == 0 {
-		fmt.Println("Usage: babe update <tools|self> [-f|--force] [-c|--check]")
-		fmt.Println("\nTargets:")
-		fmt.Println("  tools, platform-tools   Install or update Google Android Platform-Tools (adb/fastboot)")
-		fmt.Println("  self, babe              Check and update babe executable to latest GitHub release")
-		fmt.Println("\nFlags:")
-		fmt.Println("  -f, --force             Force download/reinstall even if already up to date")
-		fmt.Println("  -c, --check             Check for updates without downloading")
+		printUpdateHelp()
 		os.Exit(1)
 	}
-
+	if isHelpArg(args[0]) {
+		printUpdateHelp()
+		return
+	}
 	fs := flag.NewFlagSet("update", flag.ExitOnError)
-	force := fs.Bool("f", false, "Force reinstall even if up to date")
-	fs.BoolVar(force, "force", false, "Force reinstall even if up to date")
-	check := fs.Bool("c", false, "Check for updates only")
-	fs.BoolVar(check, "check", false, "Check for updates only")
-	toolsFlag := fs.Bool("tools", false, "Update platform-tools")
-	selfFlag := fs.Bool("self", false, "Update babe executable")
-
+	fs.Usage = printUpdateHelp
+	force := fs.Bool("f", false, "")
+	fs.BoolVar(force, "force", false, "")
+	check := fs.Bool("c", false, "")
+	fs.BoolVar(check, "check", false, "")
+	toolsFlag := fs.Bool("tools", false, "")
+	selfFlag := fs.Bool("self", false, "")
 	boolFlags := map[string]bool{"-f": true, "--force": true, "-c": true, "--check": true, "--tools": true, "--self": true}
 	_ = fs.Parse(reorderFlags(args, boolFlags))
 
@@ -89,22 +72,27 @@ func handleUpdateCLI(client *device.Client, pm platform.PlatformManager, args []
 	case "self", "babe":
 		runSelfUpdate(*force, *check)
 	default:
-		ui.Error("Unknown update target %q (valid: tools, self)", target)
+		ui.Error("Unknown update target %q. Run 'babe update --help' for usage.", target)
 		os.Exit(1)
 	}
 }
 
 func handleFastbootDomainCLI(fbClient *fastboot.Client, args []string) {
 	if len(args) == 0 {
-		fmt.Println("Usage: babe fastboot <devices|info|slot|flash> [args] [-s <serial>]")
+		printFastbootHelp()
 		os.Exit(1)
+	}
+	if isHelpArg(args[0]) {
+		printFastbootHelp()
+		return
 	}
 	sub := strings.ToLower(args[0])
 	rest := args[1:]
 
 	fs := flag.NewFlagSet("fastboot", flag.ExitOnError)
-	serial := fs.String("s", "", "Fastboot device serial")
-	fs.StringVar(serial, "serial", "", "Fastboot device serial")
+	fs.Usage = printFastbootHelp
+	serial := fs.String("s", "", "")
+	fs.StringVar(serial, "serial", "", "")
 	_ = fs.Parse(reorderFlags(rest, nil))
 
 	switch sub {
@@ -132,8 +120,12 @@ func handleFastbootDomainCLI(fbClient *fastboot.Client, args []string) {
 		}
 		ui.RenderFastbootInfo(info)
 	case "slot":
+		if len(rest) > 0 && isHelpArg(rest[0]) {
+			printFastbootSlotHelp()
+			return
+		}
 		if fs.NArg() < 1 {
-			fmt.Println("Usage: babe fastboot slot <a|b> [-s <serial>]")
+			printFastbootSlotHelp()
 			os.Exit(1)
 		}
 		target, err := resolveFastbootDevice(fbClient, *serial)
@@ -147,8 +139,12 @@ func handleFastbootDomainCLI(fbClient *fastboot.Client, args []string) {
 		}
 		ui.Success("Active slot set to %s on %s.", strings.ToUpper(fs.Arg(0)), target)
 	case "flash":
+		if len(rest) > 0 && isHelpArg(rest[0]) {
+			printFastbootFlashHelp()
+			return
+		}
 		if fs.NArg() < 2 {
-			fmt.Println("Usage: babe fastboot flash <partition> <image.img> [-s <serial>]")
+			printFastbootFlashHelp()
 			os.Exit(1)
 		}
 		target, err := resolveFastbootDevice(fbClient, *serial)
@@ -168,27 +164,33 @@ func handleFastbootDomainCLI(fbClient *fastboot.Client, args []string) {
 		}
 		ui.Success("Partition %q flashed successfully.", partition)
 	default:
-		ui.Error("Unknown fastboot subcommand %q (valid: devices, info, slot, flash)", sub)
+		ui.Error("Unknown fastboot subcommand %q. Run 'babe fastboot --help' for usage.", sub)
 		os.Exit(1)
 	}
 }
 
 func handleImageDomainCLI(args []string) {
 	if len(args) == 0 {
-		fmt.Println("Usage: babe image inspect <boot.img|init_boot.img>")
+		printImageHelp()
 		os.Exit(1)
+	}
+	if isHelpArg(args[0]) {
+		printImageHelp()
+		return
 	}
 	sub := strings.ToLower(args[0])
 	if sub == "inspect" || sub == "info" {
-		if len(args) < 2 {
-			fmt.Println("Usage: babe image inspect <boot.img|init_boot.img>")
-			os.Exit(1)
+		if len(args) < 2 || isHelpArg(args[1]) {
+			printImageHelp()
+			if len(args) < 2 {
+				os.Exit(1)
+			}
+			return
 		}
 		sub = args[1]
 	} else {
 		sub = args[0]
 	}
-
 	info, err := image.InspectBootImage(sub)
 	if err != nil {
 		ui.Error("%v", err)
