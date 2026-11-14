@@ -20,7 +20,9 @@ func main() {
 	cleanupOldBinary()
 
 	if len(os.Args) > 1 {
-		handleCLI(os.Args[1:])
+		if err := executeCLI(os.Args[1:]); err != nil {
+			os.Exit(1)
+		}
 		return
 	}
 
