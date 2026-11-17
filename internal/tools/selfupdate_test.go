@@ -108,7 +108,7 @@ func (m *mockPlatformManager) AddToPath(dir string) error {
 	m.inPath = true
 	return nil
 }
-func (m *mockPlatformManager) RemoveFromPath(dir string) error        { m.inPath = false; return nil }
+func (m *mockPlatformManager) RemoveFromPath(dir string) error         { m.inPath = false; return nil }
 func (m *mockPlatformManager) OpenFilePicker(t string) (string, error) { return "", nil }
 
 func TestSetupBabe_Idempotent(t *testing.T) {
