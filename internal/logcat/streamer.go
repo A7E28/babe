@@ -84,7 +84,7 @@ func Stream(ctx context.Context, opts StreamOptions, handler LineHandler) error 
 	return err
 }
 
-// DumpCrashLogs harvests the device's crash ring buffer (`logcat -b crash -v time -d`) and exits immediately.
+// DumpCrashLogs dumps the device's crash ring buffer (`logcat -b crash -v time -d`) and exits immediately.
 func DumpCrashLogs(ctx context.Context, adbBinary, serial, outputFile string, handler LineHandler) (int, error) {
 	if adbBinary == "" {
 		adbBinary = "adb"

@@ -16,7 +16,7 @@ import (
 func logcatMenu(client *device.Client, reader *bufio.Reader) {
 	ui.Section("Logcat & Crash Forensics")
 	ui.RenderMenuItem(1, "Live Colored Logcat Stream")
-	ui.RenderMenuItem(2, "Harvest Crash & Native Tombstone Buffer (Instant Dump)")
+	ui.RenderMenuItem(2, "Dump Crash & Native Tombstone Buffer")
 	ui.RenderMenuItem(3, "Cancel")
 	ui.Prompt(fmt.Sprintf("\n%s ", ui.White("Enter choice [1-3]:")))
 
@@ -28,11 +28,11 @@ func logcatMenu(client *device.Client, reader *bufio.Reader) {
 	case "1":
 		startLogcatStream(client, reader)
 	case "2":
-		harvestCrashLogs(client, reader)
+		dumpCrashLogs(client, reader)
 	}
 }
 
-func harvestCrashLogs(client *device.Client, reader *bufio.Reader) {
+func dumpCrashLogs(client *device.Client, reader *bufio.Reader) {
 	serial, err := selectDevice(client, reader)
 	if err != nil {
 		ui.Warn("%v", err)
@@ -52,14 +52,14 @@ func harvestCrashLogs(client *device.Client, reader *bufio.Reader) {
 	ui.Divider()
 
 	if err != nil {
-		ui.Error("Crash harvest failed: %v", err)
+		ui.Error("Crash log dump failed: %v", err)
 		return
 	}
 	if count == 0 {
 		ui.Info("No crash entries found in device crash buffer.")
 		return
 	}
-	ui.Success("Harvested %d crash log line(s).", count)
+	ui.Success("Dumped %d crash log line(s).", count)
 	if outFile != "" {
 		ui.Success("Crash report saved to: %s", outFile)
 	}

@@ -33,7 +33,7 @@ func runInteractiveMenu() {
 		ui.RenderMenuItem(2, "Platform-Tools & babe Updates (Status / Install / Self-Update)")
 		ui.RenderMenuItem(3, "Device Telemetry & Reboot (ADB)")
 		ui.RenderMenuItem(4, "Fastboot & Slot A/B Manager")
-		ui.RenderMenuItem(5, "Logcat Stream & Crash Harvester")
+		ui.RenderMenuItem(5, "Logcat Stream & Crash Dump")
 		ui.RenderMenuItem(6, "APK & Split-Bundle Suite (Inspect / Install / Packages)")
 		ui.RenderMenuItem(7, "Firmware Boot Image Inspector (boot.img / init_boot.img)")
 		ui.RenderMenuItem(8, "Calculate File Checksum (MD5 / SHA1 / SHA256)")
