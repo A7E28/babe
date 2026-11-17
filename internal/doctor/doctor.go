@@ -63,7 +63,7 @@ func FindExecutablesInPath(binBaseName, pathEnv string) []string {
 
 // RunDiagnostics executes a comprehensive suite of host, toolchain, PATH, and USB device checks.
 func RunDiagnostics(ctx context.Context, adbClient *device.Client, fbClient *fastboot.Client, pm platform.PlatformManager) []CheckResult {
-	var results []CheckResult
+	results := make([]CheckResult, 0, 6)
 	pathEnv := os.Getenv("PATH")
 
 	adbCtx, cancelADB := context.WithTimeout(ctx, 4*time.Second)

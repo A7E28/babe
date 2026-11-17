@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/A7E28/babe/internal/hash"
 )
@@ -39,6 +40,7 @@ type DeviceInfo struct {
 
 // Client wraps fastboot binary execution and output parsing.
 type Client struct {
+	mu             sync.RWMutex
 	fastbootBinary string
 }
 
@@ -47,10 +49,30 @@ func NewClient() *Client {
 	return &Client{fastbootBinary: resolveFastbootBinary("fastboot")}
 }
 
+// SetBinaryPath allows overriding the fastboot executable path.
+func (c *Client) SetBinaryPath(path string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.fastbootBinary = path
+}
+
 // BinaryPath returns the resolved fastboot executable path.
 func (c *Client) BinaryPath() string {
-	c.fastbootBinary = resolveFastbootBinary(c.fastbootBinary)
-	return c.fastbootBinary
+	c.mu.RLock()
+	cur := c.fastbootBinary
+	c.mu.RUnlock()
+
+	resolved := resolveFastbootBinary(cur)
+	if resolved != cur {
+		c.mu.Lock()
+		if c.fastbootBinary == cur {
+			c.fastbootBinary = resolved
+		}
+		cur = c.fastbootBinary
+		c.mu.Unlock()
+		return cur
+	}
+	return resolved
 }
 
 func resolveFastbootBinary(current string) string {

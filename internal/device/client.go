@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -33,6 +34,7 @@ type Device struct {
 
 // Client wraps ADB execution with context timeouts and safe argument handling.
 type Client struct {
+	mu        sync.RWMutex
 	adbBinary string
 }
 
@@ -43,13 +45,28 @@ func NewClient() *Client {
 
 // SetBinaryPath allows overriding the adb executable path.
 func (c *Client) SetBinaryPath(path string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.adbBinary = path
 }
 
 // BinaryPath returns the currently configured or resolved ADB executable path.
 func (c *Client) BinaryPath() string {
-	c.adbBinary = resolveADBBinary(c.adbBinary)
-	return c.adbBinary
+	c.mu.RLock()
+	cur := c.adbBinary
+	c.mu.RUnlock()
+
+	resolved := resolveADBBinary(cur)
+	if resolved != cur {
+		c.mu.Lock()
+		if c.adbBinary == cur {
+			c.adbBinary = resolved
+		}
+		cur = c.adbBinary
+		c.mu.Unlock()
+		return cur
+	}
+	return resolved
 }
 
 func resolveADBBinary(current string) string {
@@ -151,7 +168,7 @@ func (c *Client) GetInstallationDetails(ctx context.Context) InstallationDetails
 	}
 	ver, binPath := ParseADBVersionOutput(output)
 	if binPath == "" {
-		if p, err := exec.LookPath(c.adbBinary); err == nil {
+		if p, err := exec.LookPath(c.BinaryPath()); err == nil {
 			binPath = p
 		}
 	}
