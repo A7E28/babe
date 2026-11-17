@@ -57,6 +57,9 @@ func TestCLI_HelpSubcommands_DoNotPanic(t *testing.T) {
 		{"apk", "pull", "--help"},
 		{"image", "--help"},
 		{"image", "inspect", "--help"},
+		{"image", "payload", "--help"},
+		{"image", "payload", "list", "--help"},
+		{"image", "payload", "extract", "--help"},
 		{"logcat", "--help"},
 		{"logcat", "crash", "--help"},
 		{"hash", "--help"},
@@ -91,12 +94,10 @@ func TestCLI_POSIXFlagOrdering(t *testing.T) {
 	fbClient := fastboot.NewClient()
 	pm := platform.DefaultManager()
 
-	// Ensure flags can be placed after positional arguments without error
 	cmd := newRootCmd(adbClient, fbClient, pm)
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
-	// Testing help flag after subcommand
 	cmd.SetArgs([]string{"apk", "inspect", "test.apk", "--help"})
 
 	if err := cmd.Execute(); err != nil {

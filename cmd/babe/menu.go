@@ -35,7 +35,7 @@ func runInteractiveMenu() {
 		ui.RenderMenuItem(4, "Fastboot & Slot A/B Manager")
 		ui.RenderMenuItem(5, "Logcat Stream & Crash Dump")
 		ui.RenderMenuItem(6, "APK & Split-Bundle Suite (Inspect / Install / Packages)")
-		ui.RenderMenuItem(7, "Firmware Boot Image Inspector (boot.img / init_boot.img)")
+		ui.RenderMenuItem(7, "Firmware & OTA Image Suite (boot.img / payload.bin)")
 		ui.RenderMenuItem(8, "Calculate File Checksum (MD5 / SHA1 / SHA256)")
 		ui.RenderMenuItem(9, "Exit")
 		ui.Prompt(fmt.Sprintf("\n%s ", ui.White("Enter choice [1-9]:")))
@@ -60,7 +60,7 @@ func runInteractiveMenu() {
 		case "6":
 			apkSuiteMenu(adbClient, pm, reader)
 		case "7":
-			bootImageMenu(pm, reader)
+			imageSuiteMenu(pm, reader)
 		case "8":
 			checksumMenu(pm, reader)
 		case "9", "q", "exit":
