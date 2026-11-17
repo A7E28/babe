@@ -20,7 +20,7 @@ func newUpdateCmd(client *device.Client, pm platform.PlatformManager) *cobra.Com
 		Short:   "Update Android SDK platform-tools or the babe executable",
 		Long:    "Update Android SDK platform-tools or the babe executable.",
 		GroupID: "core",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			target := ""
 			if toolsFlag {
 				target = "tools"
@@ -32,12 +32,19 @@ func newUpdateCmd(client *device.Client, pm platform.PlatformManager) *cobra.Com
 
 			switch target {
 			case "tools", "platform-tools", "adb", "fastboot":
+				if isJSON(cmd) {
+					return handleUpdateToolsJSON(cmd, client, force, check)
+				}
 				downloadOrUpdatePlatformTools(client, pm, force, check)
 			case "self", "babe":
+				if isJSON(cmd) {
+					return handleSelfUpdateJSON(cmd, force, check)
+				}
 				runSelfUpdate(force, check)
 			default:
 				_ = cmd.Help()
 			}
+			return nil
 		},
 	}
 
@@ -50,8 +57,12 @@ func newUpdateCmd(client *device.Client, pm platform.PlatformManager) *cobra.Com
 		Use:     "tools",
 		Aliases: []string{"platform-tools", "adb", "fastboot"},
 		Short:   "Install or update Google Android platform-tools (adb/fastboot)",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if isJSON(cmd) {
+				return handleUpdateToolsJSON(cmd, client, force, check)
+			}
 			downloadOrUpdatePlatformTools(client, pm, force, check)
+			return nil
 		},
 	}
 
@@ -59,8 +70,12 @@ func newUpdateCmd(client *device.Client, pm platform.PlatformManager) *cobra.Com
 		Use:     "self",
 		Aliases: []string{"babe"},
 		Short:   "Check and update babe executable to latest GitHub release",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if isJSON(cmd) {
+				return handleSelfUpdateJSON(cmd, force, check)
+			}
 			runSelfUpdate(force, check)
+			return nil
 		},
 	}
 

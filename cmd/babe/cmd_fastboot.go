@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -30,17 +29,23 @@ func newFastbootCmd(fbClient *fastboot.Client) *cobra.Command {
 		Aliases: []string{"list", "ls"},
 		Short:   "List attached fastboot devices",
 		Args:    cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			devs, err := fbClient.GetConnectedDevices(context.Background())
 			if err != nil {
-				ui.Error("%v", err)
-				os.Exit(1)
+				return err
+			}
+			if isJSON(cmd) {
+				if devs == nil {
+					devs = []fastboot.Device{}
+				}
+				return writeJSON(cmd.OutOrStdout(), fastbootListReport{Count: len(devs), Devices: devs})
 			}
 			if len(devs) == 0 {
 				ui.Warn("No devices attached in Fastboot mode.")
-				return
+				return nil
 			}
 			ui.RenderFastbootDevices(devs)
+			return nil
 		},
 	}
 
@@ -49,18 +54,20 @@ func newFastbootCmd(fbClient *fastboot.Client) *cobra.Command {
 		Aliases: []string{"getvar"},
 		Short:   "Inspect bootloader lock state, current slot & variables",
 		Args:    cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
-			target, err := resolveFastbootDevice(fbClient, serial)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target, err := resolveFastbootDevice(cmd, fbClient, serial)
 			if err != nil {
-				ui.Error("%v", err)
-				os.Exit(1)
+				return err
 			}
 			info, err := fbClient.GetDeviceInfo(context.Background(), target)
 			if err != nil {
-				ui.Error("%v", err)
-				os.Exit(1)
+				return err
+			}
+			if isJSON(cmd) {
+				return writeJSON(cmd.OutOrStdout(), info)
 			}
 			ui.RenderFastbootInfo(info)
+			return nil
 		},
 	}
 
@@ -68,18 +75,20 @@ func newFastbootCmd(fbClient *fastboot.Client) *cobra.Command {
 		Use:   "slot <a|b>",
 		Short: "Switch active A/B boot slot",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			target, err := resolveFastbootDevice(fbClient, serial)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target, err := resolveFastbootDevice(cmd, fbClient, serial)
 			if err != nil {
-				ui.Error("%v", err)
-				os.Exit(1)
+				return err
 			}
-			slot := args[0]
+			slot := strings.ToLower(strings.TrimSpace(args[0]))
 			if err := fbClient.SetActiveSlot(context.Background(), target, slot); err != nil {
-				ui.Error("%v", err)
-				os.Exit(1)
+				return err
+			}
+			if isJSON(cmd) {
+				return writeJSON(cmd.OutOrStdout(), slotReport{Serial: target, ActiveSlot: slot})
 			}
 			ui.Success("Active slot set to %s on %s.", strings.ToUpper(slot), target)
+			return nil
 		},
 	}
 
@@ -87,23 +96,34 @@ func newFastbootCmd(fbClient *fastboot.Client) *cobra.Command {
 		Use:   "flash <partition> <image-file>",
 		Short: "Flash partition image with SHA-256 verification",
 		Args:  cobra.ExactArgs(2),
-		Run: func(cmd *cobra.Command, args []string) {
-			target, err := resolveFastbootDevice(fbClient, serial)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target, err := resolveFastbootDevice(cmd, fbClient, serial)
 			if err != nil {
-				ui.Error("%v", err)
-				os.Exit(1)
+				return err
 			}
 			partition, imgPath := args[0], args[1]
-			fmt.Printf("Verifying SHA256 and flashing %s -> %s on %s...\n", imgPath, partition, target)
+			jsonMode := isJSON(cmd)
+			if !jsonMode {
+				fmt.Printf("Verifying SHA256 and flashing %s -> %s on %s...\n", imgPath, partition, target)
+			}
 			digest, err := fbClient.FlashPartition(context.Background(), target, partition, imgPath)
-			if digest != "" {
+			if !jsonMode && digest != "" {
 				ui.Info("Image SHA256: %s", digest)
 			}
 			if err != nil {
-				ui.Error("%v", err)
-				os.Exit(1)
+				return err
+			}
+			if jsonMode {
+				return writeJSON(cmd.OutOrStdout(), flashReport{
+					Serial:    target,
+					Partition: partition,
+					Image:     imgPath,
+					SHA256:    digest,
+					Flashed:   true,
+				})
 			}
 			ui.Success("Partition %q flashed successfully.", partition)
+			return nil
 		},
 	}
 
@@ -111,7 +131,7 @@ func newFastbootCmd(fbClient *fastboot.Client) *cobra.Command {
 	return cmd
 }
 
-func resolveFastbootDevice(fbClient *fastboot.Client, explicitSerial string) (string, error) {
+func resolveFastbootDevice(cmd *cobra.Command, fbClient *fastboot.Client, explicitSerial string) (string, error) {
 	devs, err := fbClient.GetConnectedDevices(context.Background())
 	if err != nil {
 		return "", fmt.Errorf("list fastboot devices: %w", err)
@@ -130,6 +150,8 @@ func resolveFastbootDevice(fbClient *fastboot.Client, explicitSerial string) (st
 	if len(devs) == 1 {
 		return devs[0].Serial, nil
 	}
-	ui.RenderFastbootDevices(devs)
+	if !isJSON(cmd) {
+		ui.RenderFastbootDevices(devs)
+	}
 	return "", fmt.Errorf("multiple fastboot devices detected; specify target with -s <serial>")
 }

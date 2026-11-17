@@ -1,8 +1,6 @@
 package main
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 
 	"github.com/A7E28/babe/internal/platform"
@@ -15,16 +13,19 @@ func newUdevCmd() *cobra.Command {
 		Hidden: true,
 		Short:  "Install and reload Linux Android USB udev rules",
 		Args:   cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
-			handleUdevCLI()
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return handleUdevCLI(cmd)
 		},
 	}
 }
 
-func handleUdevCLI() {
+func handleUdevCLI(cmd *cobra.Command) error {
 	if err := platform.InstallUdevRules(); err != nil {
-		ui.Error("%v", err)
-		os.Exit(1)
+		return err
+	}
+	if isJSON(cmd) {
+		return writeJSON(cmd.OutOrStdout(), udevReport{Installed: true})
 	}
 	ui.Success("Android udev rules installed and reloaded.")
+	return nil
 }

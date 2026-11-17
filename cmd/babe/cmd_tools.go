@@ -13,9 +13,13 @@ func newToolsCmd(client *device.Client, pm platform.PlatformManager) *cobra.Comm
 		Short:   "Manage Android SDK platform-tools (adb and fastboot)",
 		Long:    "Manage Android SDK platform-tools (adb and fastboot).",
 		GroupID: "core",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if isJSON(cmd) {
+				return handleToolsStatusJSON(cmd, client, pm)
+			}
 			checkPlatformTools(client, pm)
 			runBabeSetup(pm, false, true)
+			return nil
 		},
 	}
 
@@ -24,9 +28,13 @@ func newToolsCmd(client *device.Client, pm platform.PlatformManager) *cobra.Comm
 		Aliases: []string{"check"},
 		Short:   "Check installation status and PATH availability",
 		Args:    cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if isJSON(cmd) {
+				return handleToolsStatusJSON(cmd, client, pm)
+			}
 			checkPlatformTools(client, pm)
 			runBabeSetup(pm, false, true)
+			return nil
 		},
 	}
 
@@ -35,8 +43,12 @@ func newToolsCmd(client *device.Client, pm platform.PlatformManager) *cobra.Comm
 		Aliases: []string{"install", "download"},
 		Short:   "Download or update platform-tools to latest Google release",
 		Args:    cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if isJSON(cmd) {
+				return handleUpdateToolsJSON(cmd, client, false, false)
+			}
 			downloadOrUpdatePlatformTools(client, pm, false, false)
+			return nil
 		},
 	}
 
@@ -44,8 +56,12 @@ func newToolsCmd(client *device.Client, pm platform.PlatformManager) *cobra.Comm
 		Use:   "setup",
 		Short: "Configure babe binary and platform-tools in user PATH",
 		Args:  cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if isJSON(cmd) {
+				return handleSetupJSON(cmd, pm, false, false)
+			}
 			runBabeSetup(pm, false, false)
+			return nil
 		},
 	}
 

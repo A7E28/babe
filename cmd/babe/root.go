@@ -24,6 +24,9 @@ func newRootCmd(adbClient *device.Client, fbClient *fastboot.Client, pm platform
 		},
 	}
 
+	var jsonOut bool
+	rootCmd.PersistentFlags().BoolVar(&jsonOut, "json", false, "Output results as machine-readable JSON")
+
 	rootCmd.Version = version
 	rootCmd.SetVersionTemplate("babe {{.Version}}\n")
 
@@ -56,8 +59,12 @@ func newRootCmd(adbClient *device.Client, fbClient *fastboot.Client, pm platform
 		Use:   "version",
 		Short: "Print babe version",
 		Args:  cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if isJSON(cmd) {
+				return writeJSON(cmd.OutOrStdout(), versionReport{Version: version})
+			}
 			cmd.Printf("babe %s\n", version)
+			return nil
 		},
 	})
 
@@ -72,12 +79,24 @@ func newRootCmd(adbClient *device.Client, fbClient *fastboot.Client, pm platform
 	return rootCmd
 }
 
+func executeRootCmd(root *cobra.Command, args []string) error {
+	root.SetArgs(args)
+	executedCmd, err := root.ExecuteC()
+	if err != nil {
+		if isJSON(executedCmd) || hasJSONFlag(args) {
+			_ = writeJSON(root.ErrOrStderr(), errorReport{Error: err.Error()})
+		} else {
+			ui.Error("%v", err)
+		}
+		return err
+	}
+	return nil
+}
+
 func executeCLI(args []string) error {
 	adbClient := device.NewClient()
 	fbClient := fastboot.NewClient()
 	pm := platform.DefaultManager()
 
-	cmd := newRootCmd(adbClient, fbClient, pm)
-	cmd.SetArgs(args)
-	return cmd.Execute()
+	return executeRootCmd(newRootCmd(adbClient, fbClient, pm), args)
 }

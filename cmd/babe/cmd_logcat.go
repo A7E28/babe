@@ -27,13 +27,12 @@ func newLogcatCmd(client *device.Client) *cobra.Command {
 		Long:    "Stream and filter device logcat messages in real time.",
 		GroupID: "pkg",
 		Args:    cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			parsedLevel, err := logcat.ValidateLevel(level)
 			if err != nil {
-				ui.Error("%v. Valid levels: V, D, I, W, E, F.", err)
-				os.Exit(1)
+				return fmt.Errorf("%w. Valid levels: V, D, I, W, E, F", err)
 			}
-			handleLogcatCLI(client, logcat.StreamOptions{
+			return handleLogcatCLI(cmd, client, logcat.StreamOptions{
 				Serial:      serial,
 				MinLevel:    parsedLevel,
 				TagFilter:   tag,
@@ -54,8 +53,8 @@ func newLogcatCmd(client *device.Client) *cobra.Command {
 		Use:   "crash",
 		Short: "Dump device crash logs, tombstones, and native crash buffers",
 		Args:  cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
-			handleCrashLogCLI(client, serial, crashOut)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return handleCrashLogCLI(cmd, client, serial, crashOut)
 		},
 	}
 	crashCmd.Flags().StringVarP(&crashOut, "output", "o", "", "Save crash report to specified file")
@@ -64,47 +63,74 @@ func newLogcatCmd(client *device.Client) *cobra.Command {
 	return cmd
 }
 
-func handleLogcatCLI(client *device.Client, opts logcat.StreamOptions) {
-	targetSerial, err := resolveTargetDevice(client, opts.Serial)
+func handleLogcatCLI(cmd *cobra.Command, client *device.Client, opts logcat.StreamOptions) error {
+	targetSerial, err := resolveTargetDevice(cmd, client, opts.Serial)
 	if err != nil {
-		ui.Error("%v", err)
-		os.Exit(1)
+		return err
 	}
 	opts.Serial = targetSerial
 	opts.ADBBinary = client.BinaryPath()
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	ctx, cancel := context.WithCancel(sigCtx)
+	defer cancel()
 
+	jsonMode := isJSON(cmd)
+	outWriter := cmd.OutOrStdout()
+	var writeErr error
 	err = logcat.Stream(ctx, opts, func(entry logcat.Entry) {
+		if jsonMode {
+			if wErr := writeJSONLine(outWriter, entry); wErr != nil {
+				writeErr = wErr
+				cancel()
+			}
+			return
+		}
 		fmt.Println(logcat.Colorize(entry))
 	})
-	if err != nil && ctx.Err() == nil {
-		ui.Error("Logcat stream error: %v", err)
-		os.Exit(1)
+	if writeErr != nil {
+		return writeErr
 	}
+	if err != nil && ctx.Err() == nil {
+		return fmt.Errorf("logcat stream error: %w", err)
+	}
+	return nil
 }
 
-func handleCrashLogCLI(client *device.Client, serial, outFile string) {
-	targetSerial, err := resolveTargetDevice(client, serial)
+func handleCrashLogCLI(cmd *cobra.Command, client *device.Client, serial, outFile string) error {
+	targetSerial, err := resolveTargetDevice(cmd, client, serial)
 	if err != nil {
-		ui.Error("%v", err)
-		os.Exit(1)
+		return err
 	}
 
+	jsonMode := isJSON(cmd)
+	entries := []logcat.Entry{}
 	count, err := logcat.DumpCrashLogs(context.Background(), client.BinaryPath(), targetSerial, outFile, func(entry logcat.Entry) {
+		if jsonMode {
+			entries = append(entries, entry)
+			return
+		}
 		fmt.Println(logcat.Colorize(entry))
 	})
 	if err != nil {
-		ui.Error("Crash log dump failed: %v", err)
-		os.Exit(1)
+		return fmt.Errorf("crash log dump failed: %w", err)
+	}
+	if jsonMode {
+		return writeJSON(cmd.OutOrStdout(), crashLogReport{
+			Serial:     targetSerial,
+			Count:      count,
+			OutputFile: outFile,
+			Entries:    entries,
+		})
 	}
 	if count == 0 {
 		ui.Info("No crash entries found in device crash buffer.")
-		return
+		return nil
 	}
 	ui.Info("Dumped %d crash log line(s) from device %s.", count, targetSerial)
 	if outFile != "" {
 		ui.Success("Saved crash report to %s", outFile)
 	}
+	return nil
 }

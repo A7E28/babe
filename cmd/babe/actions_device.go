@@ -7,13 +7,11 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/A7E28/babe/internal/device"
 	"github.com/A7E28/babe/internal/doctor"
 	"github.com/A7E28/babe/internal/fastboot"
 	"github.com/A7E28/babe/internal/platform"
-	"github.com/A7E28/babe/internal/tools"
 	"github.com/A7E28/babe/internal/ui"
 )
 
@@ -66,82 +64,28 @@ func platformToolsMenu(client *device.Client, pm platform.PlatformManager, reade
 
 func checkPlatformTools(client *device.Client, pm platform.PlatformManager) {
 	ui.Section("Platform-Tools Status")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	details := client.GetInstallationDetails(ctx)
-
-	installDir, err := pm.GetDefaultInstallDir()
-	inPath := false
-	if err == nil {
-		inPath, _ = pm.IsInPath(installDir)
+	report, err := collectToolsStatus(client, pm)
+	if err != nil {
+		ui.Error("%v", err)
+		return
 	}
-
-	ui.RenderADBStatus(details.Installed, details.Version, details.BinaryPath, installDir, inPath)
+	pt := report.PlatformTools
+	ui.RenderADBStatus(pt.Installed, pt.Version, pt.BinaryPath, pt.InstallDir, pt.InPath)
 }
 
 func downloadOrUpdatePlatformTools(client *device.Client, pm platform.PlatformManager, force, checkOnly bool) {
 	ui.Section("Download or Update Platform-Tools")
-	ctx := context.Background()
-
-	checkCtx, cancelCheck := context.WithTimeout(ctx, 3*time.Second)
-	details := client.GetInstallationDetails(checkCtx)
-	cancelCheck()
-
 	fmt.Println("Checking for latest platform-tools release...")
-	netCtx, cancelNet := context.WithTimeout(ctx, 10*time.Second)
-	release, err := tools.FetchLatestRelease(netCtx)
-	cancelNet()
-
-	if checkOnly {
-		if err != nil {
-			ui.Error("Failed to check remote repository: %v", err)
-			return
-		}
-		if !details.Installed {
-			ui.Info("Platform-tools is not installed (latest available: v%s).", release.Version)
-			ui.Info("Run 'babe update tools' to download and configure.")
-		} else if tools.CompareVersions(details.Version, release.Version) < 0 {
-			ui.Info("Update available: v%s -> v%s", details.Version, release.Version)
-			ui.Info("Run 'babe update tools' to install.")
-		} else {
-			ui.Success("Platform-tools is up to date (v%s).", details.Version)
-		}
-		return
-	}
-
-	if err != nil {
-		if details.Installed && !force {
-			ui.Warn("Could not check remote repository: %v", err)
-			ui.Info("Platform-tools v%s is currently installed at:\n     %s", details.Version, details.BinaryPath)
-			return
-		}
-		ui.Warn("Could not query release metadata: %v", err)
-		fmt.Println("Attempting download from default repository mirror...")
-	}
-
-	if details.Installed && release != nil && !force {
-		if tools.CompareVersions(details.Version, release.Version) >= 0 {
-			ui.Success("Platform-tools is already up to date: v%s", details.Version)
-			fmt.Printf("     Binary: %s\n", details.BinaryPath)
-			return
-		}
-		ui.Info("Current version: v%s -> Latest version: v%s", details.Version, release.Version)
-	} else if !details.Installed {
-		ui.Info("Downloading Google Android Platform-Tools...")
-	}
-
-	downloadURL, expectedChecksum := "", ""
-	if release != nil {
-		downloadURL = release.ZipURL
-		expectedChecksum = release.Checksum
-	}
 
 	var lastPercent int64 = -1
-	configuredPath, err := tools.DownloadAndConfigurePlatformTools(ctx, downloadURL, expectedChecksum, func(current, total int64) {
+	var startedDownload bool
+	report, err := executeToolsUpdate(client, force, checkOnly, func(current, total int64) {
+		if !startedDownload {
+			startedDownload = true
+			ui.Info("Downloading Google Android Platform-Tools...")
+		}
 		if total > 0 {
-			percent := (current * 100) / total
-			if percent != lastPercent {
+			if percent := (current * 100) / total; percent != lastPercent {
 				lastPercent = percent
 				fmt.Printf("\rDownloading: %3d%% [%d / %d KB]", percent, current/1024, total/1024)
 			}
@@ -149,15 +93,42 @@ func downloadOrUpdatePlatformTools(client *device.Client, pm platform.PlatformMa
 			fmt.Printf("\rDownloading: %d KB", current/1024)
 		}
 	})
-
-	fmt.Println()
+	if startedDownload {
+		fmt.Println()
+	}
 	if err != nil {
-		ui.Error("Download failed: %v", err)
+		ui.Error("%v", err)
 		return
 	}
 
-	client.SetBinaryPath("adb")
-	ui.Success("Platform-tools configured at:\n     %s", configuredPath)
+	if checkOnly {
+		if report.Installed != nil && !*report.Installed {
+			ui.Info("Platform-tools is not installed (latest available: v%s).", report.LatestVersion)
+			ui.Info("Run 'babe update tools' to download and configure.")
+		} else if report.UpdateAvailable {
+			ui.Info("Update available: v%s -> v%s", report.CurrentVersion, report.LatestVersion)
+			ui.Info("Run 'babe update tools' to install.")
+		} else {
+			ui.Success("Platform-tools is up to date (v%s).", report.CurrentVersion)
+		}
+		return
+	}
+
+	if report.Warning != "" {
+		ui.Warn("%s", report.Warning)
+		if !report.Updated && report.Installed != nil && *report.Installed {
+			ui.Info("Platform-tools v%s is currently installed at:\n     %s", report.CurrentVersion, report.Path)
+			return
+		}
+	}
+
+	if !report.Updated {
+		ui.Success("Platform-tools is already up to date: v%s", report.CurrentVersion)
+		fmt.Printf("     Binary: %s\n", report.Path)
+		return
+	}
+
+	ui.Success("Platform-tools configured at:\n     %s", report.Path)
 	ui.Success("System PATH environment updated.")
 }
 

@@ -17,17 +17,19 @@ func checksumMenu(pm platform.PlatformManager, reader *bufio.Reader) {
 		return
 	}
 
-	printFileHashes(filePath)
+	if err := printFileHashes(filePath); err != nil {
+		ui.Error("Hash calculation failed: %v", err)
+	}
 }
 
-func printFileHashes(filePath string) {
+func printFileHashes(filePath string) error {
 	ui.Prompt(fmt.Sprintf("\n%s\n", ui.Gray("Computing checksums...")))
 
 	digests, err := hash.CalculateAllFileHashes(filePath)
 	if err != nil {
-		ui.Error("Hash calculation failed: %v", err)
-		return
+		return err
 	}
 
 	ui.RenderChecksums(filePath, digests.MD5, digests.SHA1, digests.SHA256)
+	return nil
 }
