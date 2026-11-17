@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -21,8 +20,9 @@ func newDoctorCmd(adbClient *device.Client, fbClient *fastboot.Client, pm platfo
 		Short:   "Run system, PATH conflict & USB diagnostics",
 		Long:    "Run system readiness, PATH shadowing conflicts, and USB device diagnostics.",
 		GroupID: "core",
-		Run: func(cmd *cobra.Command, args []string) {
-			handleDoctorCLI(adbClient, fbClient, pm, fixUdev)
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return handleDoctorCLI(cmd, adbClient, fbClient, pm, fixUdev)
 		},
 	}
 
@@ -31,13 +31,29 @@ func newDoctorCmd(adbClient *device.Client, fbClient *fastboot.Client, pm platfo
 	return cmd
 }
 
-func handleDoctorCLI(adbClient *device.Client, fbClient *fastboot.Client, pm platform.PlatformManager, fixUdev bool) {
-	ui.Section("System & USB Doctor")
+func handleDoctorCLI(cmd *cobra.Command, adbClient *device.Client, fbClient *fastboot.Client, pm platform.PlatformManager, fixUdev bool) error {
 	results := doctor.RunDiagnostics(context.Background(), adbClient, fbClient, pm)
+	if isJSON(cmd) {
+		report := doctorReport{
+			Status: summarizeDoctorStatus(results),
+			Checks: results,
+		}
+		if fixUdev {
+			if err := platform.InstallUdevRules(); err != nil {
+				return err
+			}
+			fixed := true
+			report.UdevFixed = &fixed
+		}
+		return writeJSON(cmd.OutOrStdout(), report)
+	}
+
+	ui.Section("System & USB Doctor")
 	ui.RenderDoctorResults(results)
 
 	if fixUdev {
-		fmt.Println()
-		handleUdevCLI()
+		cmd.Println()
+		return handleUdevCLI(cmd)
 	}
+	return nil
 }

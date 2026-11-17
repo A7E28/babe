@@ -128,3 +128,49 @@ func TestCLI_VersionCommand(t *testing.T) {
 		t.Errorf("expected version output to contain 'babe', got: %q", buf.String())
 	}
 }
+
+func TestCLI_ArgValidationsAndHelp(t *testing.T) {
+	invalidCases := [][]string{
+		{"update", "bogus"},
+		{"update", "--tools", "--self"},
+		{"update", "--tools", "tools"},
+		{"update", "tools", "extra"},
+		{"update", "self", "extra"},
+		{"doctor", "extra"},
+		{"setup", "extra"},
+		{"tools", "extra"},
+		{"device", "extra"},
+		{"info", "extra"},
+		{"image", "a.img", "b.img"},
+		{"install", "a.apk", "extra"},
+	}
+	for _, args := range invalidCases {
+		out, errOut, err := runCLIWithBuffers(args...)
+		if err == nil {
+			t.Errorf("expected error for %v, got nil", args)
+		}
+		if out != "" {
+			t.Errorf("expected empty stdout on error for %v, got %q", args, out)
+		}
+		if !strings.Contains(errOut, "[ERROR]") {
+			t.Errorf("expected [ERROR] on stderr for %v, got %q", args, errOut)
+		}
+	}
+
+	helpCases := [][]string{
+		{},
+		{"image"},
+		{"update"},
+		{"apk"},
+		{"fastboot"},
+	}
+	for _, args := range helpCases {
+		out, errOut, err := runCLIWithBuffers(args...)
+		if err != nil {
+			t.Errorf("expected nil error for help command %v, got %v (stderr: %s)", args, err, errOut)
+		}
+		if out == "" {
+			t.Errorf("expected non-empty help output for %v", args)
+		}
+	}
+}

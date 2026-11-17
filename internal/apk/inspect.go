@@ -17,21 +17,21 @@ const (
 )
 
 type ArchiveInfo struct {
-	FilePath          string
-	FileSize          int64
-	IsBundle          bool
-	SplitAPKs         []string
-	PackageName       string
-	VersionName       string
-	VersionCode       uint32
-	MinSDK            uint32
-	MinSDKCodename    string
-	TargetSDK         uint32
-	TargetSDKCodename string
-	ABIs              []string
-	DexCount          int
-	Permissions       []string
-	SignatureFiles    []string
+	FilePath          string   `json:"file_path"`
+	FileSize          int64    `json:"file_size"`
+	IsBundle          bool     `json:"is_bundle"`
+	SplitAPKs         []string `json:"split_apks,omitempty"`
+	PackageName       string   `json:"package_name,omitempty"`
+	VersionName       string   `json:"version_name,omitempty"`
+	VersionCode       uint32   `json:"version_code,omitempty"`
+	MinSDK            uint32   `json:"min_sdk,omitempty"`
+	MinSDKCodename    string   `json:"min_sdk_codename,omitempty"`
+	TargetSDK         uint32   `json:"target_sdk,omitempty"`
+	TargetSDKCodename string   `json:"target_sdk_codename,omitempty"`
+	ABIs              []string `json:"abis"`
+	DexCount          int      `json:"dex_count"`
+	Permissions       []string `json:"permissions"`
+	SignatureFiles    []string `json:"signature_files"`
 }
 
 // InspectArchive performs offline static analysis on an .apk, .apks, .xapk, or .apkm file.
@@ -48,8 +48,11 @@ func InspectArchive(filePath string) (*ArchiveInfo, error) {
 	defer zr.Close()
 
 	info := &ArchiveInfo{
-		FilePath: filePath,
-		FileSize: fi.Size(),
+		FilePath:       filePath,
+		FileSize:       fi.Size(),
+		ABIs:           []string{},
+		Permissions:    []string{},
+		SignatureFiles: []string{},
 	}
 
 	abiSet := make(map[string]bool)

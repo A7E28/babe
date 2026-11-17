@@ -3,6 +3,8 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/A7E28/babe/internal/hash"
 	"github.com/A7E28/babe/internal/platform"
@@ -17,17 +19,25 @@ func checksumMenu(pm platform.PlatformManager, reader *bufio.Reader) {
 		return
 	}
 
-	printFileHashes(filePath)
+	if err := printFileHashes(os.Stdout, filePath); err != nil {
+		ui.Error("Hash calculation failed: %v", err)
+	}
 }
 
-func printFileHashes(filePath string) {
-	ui.Prompt(fmt.Sprintf("\n%s\n", ui.Gray("Computing checksums...")))
+func printFileHashes(w io.Writer, filePath string) error {
+	if w == nil {
+		w = os.Stdout
+	}
+	fmt.Fprintf(w, "\n%s\n", ui.Gray("Computing checksums..."))
+	if w == os.Stdout {
+		_ = os.Stdout.Sync()
+	}
 
 	digests, err := hash.CalculateAllFileHashes(filePath)
 	if err != nil {
-		ui.Error("Hash calculation failed: %v", err)
-		return
+		return err
 	}
 
 	ui.RenderChecksums(filePath, digests.MD5, digests.SHA1, digests.SHA256)
+	return nil
 }

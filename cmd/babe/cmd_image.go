@@ -1,7 +1,7 @@
 package main
 
 import (
-	"os"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -16,13 +16,15 @@ func newImageCmd() *cobra.Command {
 		Short:   "Offline Android boot.img / init_boot.img header parser",
 		Long:    "Offline parser for Android boot.img and init_boot.img headers (v0 through v4).",
 		GroupID: "pkg",
-		Args:    cobra.ArbitraryArgs,
-		Run: func(cmd *cobra.Command, args []string) {
+		Args:    cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				_ = cmd.Help()
-				return
+				if isJSON(cmd) {
+					return fmt.Errorf("image file path required")
+				}
+				return cmd.Help()
 			}
-			runInspectBootImage(args[0])
+			return runInspectBootImage(cmd, args[0])
 		},
 	}
 
@@ -31,8 +33,8 @@ func newImageCmd() *cobra.Command {
 		Aliases: []string{"info"},
 		Short:   "Inspect boot.img or init_boot.img header",
 		Args:    cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			runInspectBootImage(args[0])
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runInspectBootImage(cmd, args[0])
 		},
 	}
 
@@ -40,11 +42,14 @@ func newImageCmd() *cobra.Command {
 	return cmd
 }
 
-func runInspectBootImage(filePath string) {
+func runInspectBootImage(cmd *cobra.Command, filePath string) error {
 	info, err := image.InspectBootImage(filePath)
 	if err != nil {
-		ui.Error("%v", err)
-		os.Exit(1)
+		return err
+	}
+	if isJSON(cmd) {
+		return writeJSON(cmd.OutOrStdout(), info)
 	}
 	ui.RenderBootImageInfo(info)
+	return nil
 }

@@ -4,6 +4,9 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/sha1"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -138,5 +141,32 @@ func TestCompareVersions(t *testing.T) {
 		if got != tt.expected {
 			t.Errorf("CompareVersions(%q, %q) = %d; want %d", tt.v1, tt.v2, got, tt.expected)
 		}
+	}
+}
+
+func TestVerifyArchiveChecksum(t *testing.T) {
+	payload := []byte("platform-tools-zip-payload")
+	tmpFile := filepath.Join(t.TempDir(), "archive.zip")
+	if err := os.WriteFile(tmpFile, payload, 0644); err != nil {
+		t.Fatalf("write temp archive: %v", err)
+	}
+
+	sum1 := sha1.Sum(payload)
+	sum256 := sha256.Sum256(payload)
+
+	if err := verifyArchiveChecksum(tmpFile, hex.EncodeToString(sum1[:])); err != nil {
+		t.Errorf("valid SHA-1 failed verification: %v", err)
+	}
+	if err := verifyArchiveChecksum(tmpFile, hex.EncodeToString(sum256[:])); err != nil {
+		t.Errorf("valid SHA-256 failed verification: %v", err)
+	}
+
+	for _, bad := range []string{"", "short", "0123456789abcdef0123456789abcdef"} {
+		if err := verifyArchiveChecksum(tmpFile, bad); err == nil {
+			t.Errorf("expected error for malformed checksum %q, got nil", bad)
+		}
+	}
+	if err := verifyArchiveChecksum(tmpFile, "0000000000000000000000000000000000000000"); err == nil {
+		t.Errorf("expected error for mismatched SHA-1, got nil")
 	}
 }

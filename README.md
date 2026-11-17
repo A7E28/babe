@@ -42,13 +42,13 @@ Run `babe` without arguments to launch the interactive TUI:
 
 ```text
 ──────────────────────────────────────────────────
-  babe v0.2.0
+  babe v0.3.1
 ──────────────────────────────────────────────────
   [1]  System & USB Doctor (Diagnostics & udev)
   [2]  Platform-Tools & babe Updates (Status / Install / Self-Update)
   [3]  Device Telemetry & Reboot (ADB)
   [4]  Fastboot & Slot A/B Manager
-  [5]  Logcat Stream & Crash Harvester
+  [5]  Logcat Stream & Crash Dump
   [6]  APK & Split-Bundle Suite (Inspect / Install / Packages)
   [7]  Firmware Boot Image Inspector (boot.img / init_boot.img)
   [8]  Calculate File Checksum (MD5 / SHA1 / SHA256)
@@ -58,7 +58,7 @@ Enter choice [1-9]:
 ```
 
 ### Domain-Scoped CLI Commands
-Every interactive feature is available via structured, scriptable CLI subcommands (flags work before or after positional arguments):
+Every interactive feature is available via structured, scriptable CLI subcommands. Pass `--json` to any command for JSON output:
 
 ```bash
 # Global PATH setup, system diagnostics & udev
@@ -96,4 +96,10 @@ babe fastboot flash init_boot magisk_patched.img [-s <serial>]
 # Logcat Streaming & Crash Forensics
 babe logcat -v W -p com.example.app -o session.log
 babe logcat crash -o crash_report.txt
+
+# JSON Output (CI / Scripting)
+babe doctor --json
+babe apk inspect app.apk --json
+babe logcat -v E --json
+
 ```

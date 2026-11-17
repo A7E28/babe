@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -21,8 +20,9 @@ func newDeviceCmd(client *device.Client) *cobra.Command {
 		Short:   "Manage and inspect connected ADB devices",
 		Long:    "Manage and inspect connected ADB devices.",
 		GroupID: "device",
-		Run: func(cmd *cobra.Command, args []string) {
-			handleDeviceListCLI(client)
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return handleDeviceListCLI(cmd, client)
 		},
 	}
 
@@ -33,8 +33,8 @@ func newDeviceCmd(client *device.Client) *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List attached ADB devices and their state",
 		Args:    cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
-			handleDeviceListCLI(client)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return handleDeviceListCLI(cmd, client)
 		},
 	}
 
@@ -42,8 +42,8 @@ func newDeviceCmd(client *device.Client) *cobra.Command {
 		Use:   "info",
 		Short: "Display device hardware, OS, battery & root status",
 		Args:  cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
-			handleDeviceInfoCLI(client, serial)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return handleDeviceInfoCLI(cmd, client, serial)
 		},
 	}
 
@@ -51,12 +51,12 @@ func newDeviceCmd(client *device.Client) *cobra.Command {
 		Use:   "reboot [system|bootloader|recovery|edl]",
 		Short: "Reboot device into specified target mode",
 		Args:  cobra.MaximumNArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			target := ""
 			if len(args) > 0 {
 				target = strings.ToLower(args[0])
 			}
-			handleRebootCLI(client, target, serial)
+			return handleRebootCLI(cmd, client, target, serial)
 		},
 	}
 
@@ -70,8 +70,8 @@ func newDevicesAliasCmd(client *device.Client) *cobra.Command {
 		Hidden: true,
 		Short:  "List attached ADB devices",
 		Args:   cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
-			handleDeviceListCLI(client)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return handleDeviceListCLI(cmd, client)
 		},
 	}
 }
@@ -82,8 +82,9 @@ func newInfoAliasCmd(client *device.Client) *cobra.Command {
 		Use:    "info",
 		Hidden: true,
 		Short:  "Display device hardware, OS, battery & root status",
-		Run: func(cmd *cobra.Command, args []string) {
-			handleDeviceInfoCLI(client, serial)
+		Args:   cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return handleDeviceInfoCLI(cmd, client, serial)
 		},
 	}
 	cmd.Flags().StringVarP(&serial, "serial", "s", "", "Target specific device serial")
@@ -97,19 +98,19 @@ func newRebootAliasCmd(client *device.Client) *cobra.Command {
 		Hidden: true,
 		Short:  "Reboot device into specified target mode",
 		Args:   cobra.MaximumNArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			target := ""
 			if len(args) > 0 {
 				target = strings.ToLower(args[0])
 			}
-			handleRebootCLI(client, target, serial)
+			return handleRebootCLI(cmd, client, target, serial)
 		},
 	}
 	cmd.Flags().StringVarP(&serial, "serial", "s", "", "Target specific device serial")
 	return cmd
 }
 
-func resolveTargetDevice(client *device.Client, explicitSerial string) (string, error) {
+func resolveTargetDevice(cmd *cobra.Command, client *device.Client, explicitSerial string) (string, error) {
 	devices, err := client.GetConnectedDevices(context.Background())
 	if err != nil {
 		return "", fmt.Errorf("list devices: %w", err)
@@ -137,48 +138,58 @@ func resolveTargetDevice(client *device.Client, explicitSerial string) (string, 
 		return devices[0].Serial, nil
 	}
 
-	ui.RenderDeviceList(devices)
+	if !isJSON(cmd) {
+		ui.RenderDeviceList(devices)
+	}
 	return "", fmt.Errorf("multiple devices detected; specify target with -s <serial>")
 }
 
-func handleDeviceListCLI(client *device.Client) {
+func handleDeviceListCLI(cmd *cobra.Command, client *device.Client) error {
 	devices, err := client.GetConnectedDevices(context.Background())
 	if err != nil {
-		ui.Error("%v", err)
-		os.Exit(1)
+		return err
+	}
+	if isJSON(cmd) {
+		if devices == nil {
+			devices = []device.Device{}
+		}
+		return writeJSON(cmd.OutOrStdout(), deviceListReport{Count: len(devices), Devices: devices})
 	}
 	if len(devices) == 0 {
 		ui.Warn("No ADB devices attached.")
-		return
+		return nil
 	}
 	ui.RenderDeviceList(devices)
+	return nil
 }
 
-func handleDeviceInfoCLI(client *device.Client, serial string) {
-	targetSerial, err := resolveTargetDevice(client, serial)
+func handleDeviceInfoCLI(cmd *cobra.Command, client *device.Client, serial string) error {
+	targetSerial, err := resolveTargetDevice(cmd, client, serial)
 	if err != nil {
-		ui.Error("%v", err)
-		os.Exit(1)
+		return err
 	}
 	info, err := client.GetDeviceInfo(context.Background(), targetSerial)
 	if err != nil {
-		ui.Error("Query device info: %v", err)
-		os.Exit(1)
+		return fmt.Errorf("query device info: %w", err)
+	}
+	if isJSON(cmd) {
+		return writeJSON(cmd.OutOrStdout(), info)
 	}
 	ui.RenderDeviceInfo(info)
+	return nil
 }
 
-func handleRebootCLI(client *device.Client, targetStr, serial string) {
-	targetSerial, err := resolveTargetDevice(client, serial)
+func handleRebootCLI(cmd *cobra.Command, client *device.Client, targetStr, serial string) error {
+	targetSerial, err := resolveTargetDevice(cmd, client, serial)
 	if err != nil {
-		ui.Error("%v", err)
-		os.Exit(1)
+		return err
 	}
 
 	var target device.RebootTarget
 	switch targetStr {
 	case "", "system", "normal":
 		target = device.RebootSystem
+		targetStr = "system"
 	case "bootloader", "fastboot":
 		target = device.RebootBootloader
 	case "recovery":
@@ -186,13 +197,15 @@ func handleRebootCLI(client *device.Client, targetStr, serial string) {
 	case "edl":
 		target = device.RebootEDL
 	default:
-		ui.Error("Unknown reboot target %q (valid: system, bootloader, recovery, edl)", targetStr)
-		os.Exit(1)
+		return fmt.Errorf("unknown reboot target %q (valid: system, bootloader, recovery, edl)", targetStr)
 	}
 
 	if err := client.Reboot(context.Background(), targetSerial, target); err != nil {
-		ui.Error("%v", err)
-		os.Exit(1)
+		return err
+	}
+	if isJSON(cmd) {
+		return writeJSON(cmd.OutOrStdout(), rebootReport{Serial: targetSerial, Target: targetStr, Rebooted: true})
 	}
 	ui.Success("Reboot command sent to device %s.", targetSerial)
+	return nil
 }

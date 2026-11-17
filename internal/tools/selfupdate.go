@@ -3,6 +3,7 @@ package tools
 import (
 	"bufio"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -139,14 +140,45 @@ func ParseChecksums(content string) map[string]string {
 		if len(parts) >= 2 {
 			hashVal := strings.ToLower(parts[0])
 			fileName := strings.TrimPrefix(parts[1], "*")
+			fileName = strings.TrimPrefix(fileName, "./")
 			results[fileName] = hashVal
 		}
 	}
 	return results
 }
 
+// LookupChecksum resolves an asset checksum, normalizing leading "./" and falling back to case-insensitive matching.
+func LookupChecksum(checksums map[string]string, assetName string) (string, bool) {
+	target := strings.TrimPrefix(strings.TrimSpace(assetName), "./")
+	if target == "" {
+		return "", false
+	}
+	if sum, ok := checksums[target]; ok {
+		return sum, true
+	}
+	for k, v := range checksums {
+		if strings.EqualFold(strings.TrimPrefix(k, "./"), target) {
+			return v, true
+		}
+	}
+	return "", false
+}
+
+func isValidSHA256(s string) bool {
+	if len(s) != 64 {
+		return false
+	}
+	_, err := hex.DecodeString(s)
+	return err == nil
+}
+
 // downloads the update, verifies its sha256 checksum, and replaces the running binary.
 func ApplyBabeUpdate(ctx context.Context, asset *GitHubAsset, expectedSHA256 string, onProgress ProgressFunc) (string, error) {
+	expectedSHA256 = strings.TrimSpace(expectedSHA256)
+	if !isValidSHA256(expectedSHA256) {
+		return "", fmt.Errorf("valid 64-character SHA-256 checksum is required for self-update")
+	}
+
 	exePath, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("resolve current executable: %w", err)
@@ -171,14 +203,12 @@ func ApplyBabeUpdate(ctx context.Context, asset *GitHubAsset, expectedSHA256 str
 		return "", fmt.Errorf("download binary: %w", err)
 	}
 
-	if expectedSHA256 != "" {
-		actualSHA, err := hash.CalculateFileHash(tempPath, hash.SHA256)
-		if err != nil {
-			return "", fmt.Errorf("calculate sha256 of downloaded binary: %w", err)
-		}
-		if !strings.EqualFold(actualSHA, expectedSHA256) {
-			return "", fmt.Errorf("checksum mismatch: expected %s, got %s", expectedSHA256, actualSHA)
-		}
+	actualSHA, err := hash.CalculateFileHash(tempPath, hash.SHA256)
+	if err != nil {
+		return "", fmt.Errorf("calculate sha256 of downloaded binary: %w", err)
+	}
+	if !strings.EqualFold(actualSHA, expectedSHA256) {
+		return "", fmt.Errorf("checksum mismatch: expected %s, got %s", expectedSHA256, actualSHA)
 	}
 
 	if err := replaceExecutable(exePath, tempPath); err != nil {

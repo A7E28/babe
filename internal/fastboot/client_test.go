@@ -1,7 +1,10 @@
 package fastboot
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
+	"sync"
 	"testing"
 )
 
@@ -44,4 +47,29 @@ Finished. Total time: 0.025s`
 	if info.MaxDownloadSize != "0x10000000" {
 		t.Errorf("got MaxDownloadSize %q, want 0x10000000", info.MaxDownloadSize)
 	}
+}
+
+func TestClient_ConcurrentBinaryPath(t *testing.T) {
+	fakeFB := filepath.Join(t.TempDir(), "fastboot")
+	if err := os.WriteFile(fakeFB, []byte("stub"), 0755); err != nil {
+		t.Fatalf("write fake fastboot: %v", err)
+	}
+
+	c := NewClient()
+	var wg sync.WaitGroup
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			if idx%2 == 0 {
+				c.SetBinaryPath(fakeFB)
+			} else {
+				c.SetBinaryPath("fastboot")
+			}
+			if got := c.BinaryPath(); got == "" {
+				t.Errorf("BinaryPath returned empty string")
+			}
+		}(i)
+	}
+	wg.Wait()
 }

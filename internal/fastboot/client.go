@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/A7E28/babe/internal/hash"
 )
@@ -20,18 +21,26 @@ var (
 )
 
 type Device struct {
-	Serial string
-	Mode   string
+	Serial string `json:"serial"`
+	Mode   string `json:"mode"`
 }
 
 type DeviceInfo struct {
-	Serial, Product, BootloaderVersion, BasebandVersion string
-	SerialNumber, Secure, Unlocked                      string
-	CurrentSlot, SlotCount, MaxDownloadSize             string
+	Serial            string `json:"serial"`
+	Product           string `json:"product,omitempty"`
+	BootloaderVersion string `json:"bootloader_version,omitempty"`
+	BasebandVersion   string `json:"baseband_version,omitempty"`
+	SerialNumber      string `json:"serial_number,omitempty"`
+	Secure            string `json:"secure,omitempty"`
+	Unlocked          string `json:"unlocked,omitempty"`
+	CurrentSlot       string `json:"current_slot,omitempty"`
+	SlotCount         string `json:"slot_count,omitempty"`
+	MaxDownloadSize   string `json:"max_download_size,omitempty"`
 }
 
 // Client wraps fastboot binary execution and output parsing.
 type Client struct {
+	mu             sync.RWMutex
 	fastbootBinary string
 }
 
@@ -40,10 +49,30 @@ func NewClient() *Client {
 	return &Client{fastbootBinary: resolveFastbootBinary("fastboot")}
 }
 
+// SetBinaryPath allows overriding the fastboot executable path.
+func (c *Client) SetBinaryPath(path string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.fastbootBinary = path
+}
+
 // BinaryPath returns the resolved fastboot executable path.
 func (c *Client) BinaryPath() string {
-	c.fastbootBinary = resolveFastbootBinary(c.fastbootBinary)
-	return c.fastbootBinary
+	c.mu.RLock()
+	cur := c.fastbootBinary
+	c.mu.RUnlock()
+
+	resolved := resolveFastbootBinary(cur)
+	if resolved != cur {
+		c.mu.Lock()
+		if c.fastbootBinary == cur {
+			c.fastbootBinary = resolved
+		}
+		cur = c.fastbootBinary
+		c.mu.Unlock()
+		return cur
+	}
+	return resolved
 }
 
 func resolveFastbootBinary(current string) string {

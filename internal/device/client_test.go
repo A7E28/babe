@@ -2,7 +2,10 @@ package device
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
+	"sync"
 	"testing"
 )
 
@@ -90,4 +93,29 @@ func TestValidateDeviceState(t *testing.T) {
 	if err := ValidateDeviceState(Device{Serial: "S4", State: StateRecovery}); !errors.Is(err, ErrDeviceNotReady) {
 		t.Errorf("expected ErrDeviceNotReady for StateRecovery, got %v", err)
 	}
+}
+
+func TestClient_ConcurrentBinaryPath(t *testing.T) {
+	fakeADB := filepath.Join(t.TempDir(), "adb")
+	if err := os.WriteFile(fakeADB, []byte("stub"), 0755); err != nil {
+		t.Fatalf("write fake adb: %v", err)
+	}
+
+	c := NewClient()
+	var wg sync.WaitGroup
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			if idx%2 == 0 {
+				c.SetBinaryPath(fakeADB)
+			} else {
+				c.SetBinaryPath("adb")
+			}
+			if got := c.BinaryPath(); got == "" {
+				t.Errorf("BinaryPath returned empty string")
+			}
+		}(i)
+	}
+	wg.Wait()
 }

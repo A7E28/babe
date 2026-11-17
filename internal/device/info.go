@@ -18,18 +18,18 @@ var (
 
 // Info holds parsed device telemetry and hardware information.
 type Info struct {
-	Serial          string
-	Model           string
-	Brand           string
-	Manufacturer    string
-	AndroidVersion  string
-	SDKLevel        int
-	BuildID         string
-	SecurityPatch   string
-	Architecture    string
-	BatteryLevel    int
-	BatteryCharging bool
-	IsRooted        bool
+	Serial          string `json:"serial"`
+	Model           string `json:"model,omitempty"`
+	Brand           string `json:"brand,omitempty"`
+	Manufacturer    string `json:"manufacturer,omitempty"`
+	AndroidVersion  string `json:"android_version,omitempty"`
+	SDKLevel        int    `json:"sdk_level,omitempty"`
+	BuildID         string `json:"build_id,omitempty"`
+	SecurityPatch   string `json:"security_patch,omitempty"`
+	Architecture    string `json:"architecture,omitempty"`
+	BatteryLevel    int    `json:"battery_level"`
+	BatteryCharging bool   `json:"battery_charging"`
+	IsRooted        bool   `json:"is_rooted"`
 }
 
 // ValidateDeviceState checks if an attached device is ready to accept ADB commands.

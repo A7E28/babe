@@ -25,10 +25,10 @@ const (
 
 // CheckResult describes a single diagnostic inspection item.
 type CheckResult struct {
-	Name    string
-	Status  Status
-	Summary string
-	Remedy  string
+	Name    string `json:"name"`
+	Status  Status `json:"status"`
+	Summary string `json:"summary"`
+	Remedy  string `json:"remedy,omitempty"`
 }
 
 // FindExecutablesInPath scans a PATH string and returns all matching executable paths in resolution order.
@@ -63,7 +63,7 @@ func FindExecutablesInPath(binBaseName, pathEnv string) []string {
 
 // RunDiagnostics executes a comprehensive suite of host, toolchain, PATH, and USB device checks.
 func RunDiagnostics(ctx context.Context, adbClient *device.Client, fbClient *fastboot.Client, pm platform.PlatformManager) []CheckResult {
-	var results []CheckResult
+	results := make([]CheckResult, 0, 6)
 	pathEnv := os.Getenv("PATH")
 
 	adbCtx, cancelADB := context.WithTimeout(ctx, 4*time.Second)

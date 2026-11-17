@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -26,13 +27,14 @@ const (
 
 // Device represents an attached physical device or emulator.
 type Device struct {
-	Serial string
-	State  State
-	Model  string
+	Serial string `json:"serial"`
+	State  State  `json:"state"`
+	Model  string `json:"model,omitempty"`
 }
 
 // Client wraps ADB execution with context timeouts and safe argument handling.
 type Client struct {
+	mu        sync.RWMutex
 	adbBinary string
 }
 
@@ -43,13 +45,28 @@ func NewClient() *Client {
 
 // SetBinaryPath allows overriding the adb executable path.
 func (c *Client) SetBinaryPath(path string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.adbBinary = path
 }
 
 // BinaryPath returns the currently configured or resolved ADB executable path.
 func (c *Client) BinaryPath() string {
-	c.adbBinary = resolveADBBinary(c.adbBinary)
-	return c.adbBinary
+	c.mu.RLock()
+	cur := c.adbBinary
+	c.mu.RUnlock()
+
+	resolved := resolveADBBinary(cur)
+	if resolved != cur {
+		c.mu.Lock()
+		if c.adbBinary == cur {
+			c.adbBinary = resolved
+		}
+		cur = c.adbBinary
+		c.mu.Unlock()
+		return cur
+	}
+	return resolved
 }
 
 func resolveADBBinary(current string) string {
@@ -120,10 +137,10 @@ func (c *Client) executeBytes(ctx context.Context, args ...string) ([]byte, erro
 
 // InstallationDetails contains information about the discovered ADB binary.
 type InstallationDetails struct {
-	Installed  bool
-	Version    string
-	BinaryPath string
-	RawOutput  string
+	Installed  bool   `json:"installed"`
+	Version    string `json:"version,omitempty"`
+	BinaryPath string `json:"binary_path,omitempty"`
+	RawOutput  string `json:"-"`
 }
 
 // ParseADBVersionOutput extracts the revision version and binary path from adb version output.
@@ -151,7 +168,7 @@ func (c *Client) GetInstallationDetails(ctx context.Context) InstallationDetails
 	}
 	ver, binPath := ParseADBVersionOutput(output)
 	if binPath == "" {
-		if p, err := exec.LookPath(c.adbBinary); err == nil {
+		if p, err := exec.LookPath(c.BinaryPath()); err == nil {
 			binPath = p
 		}
 	}

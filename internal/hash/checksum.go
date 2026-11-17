@@ -22,9 +22,9 @@ const (
 
 // holds MD5, SHA1, and SHA256 hexadecimal digests computed in a single pass.
 type MultiDigest struct {
-	MD5    string
-	SHA1   string
-	SHA256 string
+	MD5    string `json:"md5"`
+	SHA1   string `json:"sha1"`
+	SHA256 string `json:"sha256"`
 }
 
 // computes MD5, SHA1, and SHA256 digests of a file in a single streaming read.
