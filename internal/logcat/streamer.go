@@ -135,7 +135,7 @@ func resolveTargetPIDs(ctx context.Context, adbBin string, opts StreamOptions) (
 	return pids, nil
 }
 
-func runLogcatProcess(ctx context.Context, adbBin string, args []string, outputFile string, onEntry func(Entry) bool) (int, error) {
+func runLogcatProcess(ctx context.Context, adbBin string, args []string, outputFile string, onEntry func(Entry) bool) (count int, retErr error) {
 	cmd := exec.CommandContext(ctx, adbBin, args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -152,7 +152,11 @@ func runLogcatProcess(ctx context.Context, adbBin string, args []string, outputF
 			return 0, fmt.Errorf("create logcat output file: %w", err)
 		}
 		fileWriter = f
-		defer fileWriter.Close()
+		defer func() {
+			if cErr := fileWriter.Close(); cErr != nil && retErr == nil {
+				retErr = fmt.Errorf("close logcat output file: %w", cErr)
+			}
+		}()
 	}
 
 	if err := cmd.Start(); err != nil {
@@ -162,7 +166,6 @@ func runLogcatProcess(ctx context.Context, adbBin string, args []string, outputF
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 64*1024), 512*1024)
 
-	count := 0
 	for scanner.Scan() {
 		raw := scanner.Text()
 		if strings.HasPrefix(strings.TrimSpace(raw), "--------- beginning of") {

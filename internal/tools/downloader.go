@@ -28,7 +28,7 @@ func (pw *progressWriter) Write(p []byte) (int, error) {
 }
 
 // downloads a URL to destPath with real-time progress reporting and context cancellation.
-func DownloadFile(ctx context.Context, url, destPath string, onProgress ProgressFunc) error {
+func DownloadFile(ctx context.Context, url, destPath string, onProgress ProgressFunc) (retErr error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("create download request: %w", err)
@@ -52,7 +52,11 @@ func DownloadFile(ctx context.Context, url, destPath string, onProgress Progress
 	if err != nil {
 		return fmt.Errorf("create destination file %s: %w", destPath, err)
 	}
-	defer out.Close()
+	defer func() {
+		if cErr := out.Close(); cErr != nil && retErr == nil {
+			retErr = fmt.Errorf("close destination file %s: %w", destPath, cErr)
+		}
+	}()
 
 	pw := &progressWriter{
 		total:      resp.ContentLength,

@@ -85,12 +85,16 @@ func InstallBundle(ctx context.Context, client *device.Client, serial, bundlePat
 }
 
 // PackSplitBundle packages multiple split APK files into a single .apks zip archive using Store compression.
-func PackSplitBundle(splitPaths []string, bundlePath string) error {
+func PackSplitBundle(splitPaths []string, bundlePath string) (retErr error) {
 	outFile, err := os.OpenFile(bundlePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
-	defer outFile.Close()
+	defer func() {
+		if cErr := outFile.Close(); cErr != nil && retErr == nil {
+			retErr = cErr
+		}
+	}()
 
 	zw := zip.NewWriter(outFile)
 	buf := make([]byte, 64*1024)
@@ -133,7 +137,7 @@ func addFileToZip(zw *zip.Writer, filePath string, buf []byte) error {
 	return err
 }
 
-func extractZipEntry(f *zip.File, destPath string) error {
+func extractZipEntry(f *zip.File, destPath string) (retErr error) {
 	src, err := f.Open()
 	if err != nil {
 		return err
@@ -144,7 +148,11 @@ func extractZipEntry(f *zip.File, destPath string) error {
 	if err != nil {
 		return err
 	}
-	defer dst.Close()
+	defer func() {
+		if cErr := dst.Close(); cErr != nil && retErr == nil {
+			retErr = cErr
+		}
+	}()
 
 	buf := make([]byte, 64*1024)
 	_, err = io.CopyBuffer(dst, src, buf)

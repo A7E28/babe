@@ -50,7 +50,7 @@ func ExtractZip(zipPath, destDir string) error {
 	return nil
 }
 
-func extractFile(f *zip.File, targetPath string) error {
+func extractFile(f *zip.File, targetPath string) (retErr error) {
 	src, err := f.Open()
 	if err != nil {
 		return err
@@ -67,7 +67,11 @@ func extractFile(f *zip.File, targetPath string) error {
 	if err != nil {
 		return err
 	}
-	defer dst.Close()
+	defer func() {
+		if cErr := dst.Close(); cErr != nil && retErr == nil {
+			retErr = cErr
+		}
+	}()
 
 	buf := make([]byte, 64*1024)
 	if _, err := io.CopyBuffer(dst, src, buf); err != nil {
