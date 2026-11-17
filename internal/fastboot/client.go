@@ -20,14 +20,21 @@ var (
 )
 
 type Device struct {
-	Serial string
-	Mode   string
+	Serial string `json:"serial"`
+	Mode   string `json:"mode"`
 }
 
 type DeviceInfo struct {
-	Serial, Product, BootloaderVersion, BasebandVersion string
-	SerialNumber, Secure, Unlocked                      string
-	CurrentSlot, SlotCount, MaxDownloadSize             string
+	Serial            string `json:"serial"`
+	Product           string `json:"product,omitempty"`
+	BootloaderVersion string `json:"bootloader_version,omitempty"`
+	BasebandVersion   string `json:"baseband_version,omitempty"`
+	SerialNumber      string `json:"serial_number,omitempty"`
+	Secure            string `json:"secure,omitempty"`
+	Unlocked          string `json:"unlocked,omitempty"`
+	CurrentSlot       string `json:"current_slot,omitempty"`
+	SlotCount         string `json:"slot_count,omitempty"`
+	MaxDownloadSize   string `json:"max_download_size,omitempty"`
 }
 
 // Client wraps fastboot binary execution and output parsing.

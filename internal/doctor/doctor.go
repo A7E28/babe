@@ -25,10 +25,10 @@ const (
 
 // CheckResult describes a single diagnostic inspection item.
 type CheckResult struct {
-	Name    string
-	Status  Status
-	Summary string
-	Remedy  string
+	Name    string `json:"name"`
+	Status  Status `json:"status"`
+	Summary string `json:"summary"`
+	Remedy  string `json:"remedy,omitempty"`
 }
 
 // FindExecutablesInPath scans a PATH string and returns all matching executable paths in resolution order.

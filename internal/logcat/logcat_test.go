@@ -2,6 +2,7 @@ package logcat
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -121,5 +122,20 @@ func TestStream_ReportsSubprocessError(t *testing.T) {
 	_, crashErr := DumpCrashLogs(context.Background(), "go", "nonexistent", "", nil)
 	if crashErr == nil {
 		t.Errorf("expected DumpCrashLogs to return an error when subprocess exits non-zero, got nil")
+	}
+}
+
+func TestEntry_MarshalJSON(t *testing.T) {
+	entry := ParseLine("10-31 00:15:32.123 W/ActivityManager( 1234): Slow operation")
+	raw, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("json.Marshal(Entry) failed: %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal failed: %v", err)
+	}
+	if decoded["level"] != "W" || decoded["tag"] != "ActivityManager" || decoded["pid"] != "1234" {
+		t.Errorf("unexpected JSON fields: %v", decoded)
 	}
 }

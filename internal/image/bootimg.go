@@ -13,17 +13,17 @@ const BootMagic = "ANDROID!"
 
 // holds metadata extracted from an Android boot.img or init_boot.img header.
 type BootImageInfo struct {
-	FilePath      string
-	FileSize      int64
-	HeaderVersion uint32
-	PageSize      uint32
-	KernelSize    uint32
-	RamdiskSize   uint32
-	SecondSize    uint32
-	OSVersion     string
-	OSPatchLevel  string
-	BoardName     string
-	Cmdline       string
+	FilePath      string `json:"file_path"`
+	FileSize      int64  `json:"file_size"`
+	HeaderVersion uint32 `json:"header_version"`
+	PageSize      uint32 `json:"page_size"`
+	KernelSize    uint32 `json:"kernel_size"`
+	RamdiskSize   uint32 `json:"ramdisk_size"`
+	SecondSize    uint32 `json:"second_size,omitempty"`
+	OSVersion     string `json:"os_version,omitempty"`
+	OSPatchLevel  string `json:"os_patch_level,omitempty"`
+	BoardName     string `json:"board_name,omitempty"`
+	Cmdline       string `json:"cmdline,omitempty"`
 }
 
 // parses an Android boot.img or init_boot.img file header (versions 0 to 4).

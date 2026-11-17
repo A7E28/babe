@@ -26,9 +26,9 @@ const (
 
 // Device represents an attached physical device or emulator.
 type Device struct {
-	Serial string
-	State  State
-	Model  string
+	Serial string `json:"serial"`
+	State  State  `json:"state"`
+	Model  string `json:"model,omitempty"`
 }
 
 // Client wraps ADB execution with context timeouts and safe argument handling.
@@ -120,10 +120,10 @@ func (c *Client) executeBytes(ctx context.Context, args ...string) ([]byte, erro
 
 // InstallationDetails contains information about the discovered ADB binary.
 type InstallationDetails struct {
-	Installed  bool
-	Version    string
-	BinaryPath string
-	RawOutput  string
+	Installed  bool   `json:"installed"`
+	Version    string `json:"version,omitempty"`
+	BinaryPath string `json:"binary_path,omitempty"`
+	RawOutput  string `json:"-"`
 }
 
 // ParseADBVersionOutput extracts the revision version and binary path from adb version output.

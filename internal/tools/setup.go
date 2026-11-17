@@ -15,23 +15,23 @@ import (
 
 // describes the current global installation state of babe.
 type BabeInstallStatus struct {
-	CurrentExecutable string
-	CanonicalBinDir   string
-	CanonicalBinPath  string
-	RunningFromTarget bool
-	BinaryInstalled   bool
-	UpToDate          bool
-	InPath            bool
+	CurrentExecutable string `json:"current_executable"`
+	CanonicalBinDir   string `json:"canonical_bin_dir"`
+	CanonicalBinPath  string `json:"canonical_bin_path"`
+	RunningFromTarget bool   `json:"running_from_target"`
+	BinaryInstalled   bool   `json:"binary_installed"`
+	UpToDate          bool   `json:"up_to_date"`
+	InPath            bool   `json:"in_path"`
 }
 
 // summarizes the actions taken during SetupBabe.
 type SetupResult struct {
-	TargetBinDir     string
-	TargetBinPath    string
-	AlreadyInstalled bool
-	BinaryUpdated    bool
-	PathConfigured   bool
-	PathAlreadySet   bool
+	TargetBinDir     string `json:"target_bin_dir"`
+	TargetBinPath    string `json:"target_bin_path"`
+	AlreadyInstalled bool   `json:"already_installed"`
+	BinaryUpdated    bool   `json:"binary_updated"`
+	PathConfigured   bool   `json:"path_configured"`
+	PathAlreadySet   bool   `json:"path_already_set"`
 }
 
 // inspects whether babe is installed in the canonical user bin directory and registered in PATH.

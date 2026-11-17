@@ -1,6 +1,7 @@
 package logcat
 
 import (
+	"encoding/json"
 	"strings"
 )
 
@@ -33,6 +34,11 @@ func (l Level) String() string {
 	default:
 		return "?"
 	}
+}
+
+// MarshalJSON encodes Level as its single-letter logcat tag.
+func (l Level) MarshalJSON() ([]byte, error) {
+	return json.Marshal(l.String())
 }
 
 // converts a string into a Level, defaulting to LevelVerbose.
@@ -74,12 +80,12 @@ func (e *InvalidLevelError) Error() string {
 
 // represents a parsed logcat log record.
 type Entry struct {
-	Raw     string
-	Time    string
-	Level   Level
-	PID     string
-	Tag     string
-	Message string
+	Raw     string `json:"raw"`
+	Time    string `json:"time,omitempty"`
+	Level   Level  `json:"level"`
+	PID     string `json:"pid,omitempty"`
+	Tag     string `json:"tag,omitempty"`
+	Message string `json:"message"`
 }
 
 // parses a standard "-v time" logcat line:
