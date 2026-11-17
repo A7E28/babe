@@ -9,7 +9,6 @@ import (
 	"time"
 )
 
-// ProgressFunc receives the current bytes downloaded and the total content length.
 type ProgressFunc func(current, total int64)
 
 type progressWriter struct {
@@ -27,7 +26,6 @@ func (pw *progressWriter) Write(p []byte) (int, error) {
 	return n, nil
 }
 
-// DownloadFile downloads a URL to destPath
 func DownloadFile(ctx context.Context, url, destPath string, onProgress ProgressFunc) error {
 	client := &http.Client{
 		Timeout: 30 * time.Minute,
@@ -35,7 +33,6 @@ func DownloadFile(ctx context.Context, url, destPath string, onProgress Progress
 	return DownloadFileWithClient(ctx, client, url, destPath, onProgress)
 }
 
-// DownloadFileWithClient downloads a URL to destPath using the supplied HTTP client.
 func DownloadFileWithClient(ctx context.Context, client *http.Client, rawURL, destPath string, onProgress ProgressFunc) error {
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Minute}

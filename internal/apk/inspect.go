@@ -34,7 +34,6 @@ type ArchiveInfo struct {
 	SignatureFiles    []string `json:"signature_files"`
 }
 
-// InspectArchive performs offline static analysis on an .apk, .apks, .xapk, or .apkm file.
 func InspectArchive(filePath string) (*ArchiveInfo, error) {
 	fi, err := os.Stat(filePath)
 	if err != nil {

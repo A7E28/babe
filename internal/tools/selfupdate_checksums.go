@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-// FetchReleaseChecksums retrieves and parses the checksums.txt file from the release.
 func FetchReleaseChecksums(ctx context.Context, release *GitHubRelease) (map[string]string, error) {
 	var checksumAsset *GitHubAsset
 	for i := range release.Assets {
@@ -53,7 +52,6 @@ func FetchReleaseChecksums(ctx context.Context, release *GitHubRelease) (map[str
 	return ParseChecksums(string(body)), nil
 }
 
-// ParseChecksums parses standard sha256sum format lines: "<hash>  <filename>".
 func ParseChecksums(content string) map[string]string {
 	results := make(map[string]string)
 	scanner := bufio.NewScanner(strings.NewReader(content))
@@ -73,7 +71,6 @@ func ParseChecksums(content string) map[string]string {
 	return results
 }
 
-// LookupChecksum resolves an asset checksum, normalizing leading "./" and falling back to case-insensitive matching.
 func LookupChecksum(checksums map[string]string, assetName string) (string, bool) {
 	target := strings.TrimPrefix(strings.TrimSpace(assetName), "./")
 	if target == "" {

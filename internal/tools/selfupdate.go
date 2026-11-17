@@ -18,7 +18,6 @@ import (
 
 const babeReleasesLatestAPI = "https://api.github.com/repos/A7E28/babe/releases/latest"
 
-// GitHubRelease represents release metadata for the latest babe release.
 type GitHubRelease struct {
 	TagName     string        `json:"tag_name"`
 	Name        string        `json:"name"`
@@ -27,7 +26,6 @@ type GitHubRelease struct {
 	PublishedAt string        `json:"published_at"`
 }
 
-// GitHubAsset represents a downloadable binary or asset in a release.
 type GitHubAsset struct {
 	Name               string `json:"name"`
 	BrowserDownloadURL string `json:"browser_download_url"`
@@ -35,8 +33,7 @@ type GitHubAsset struct {
 	SHA256             string `json:"sha256,omitempty"`
 }
 
-// FetchLatestBabeRelease queries latest.json on GitHub Releases without using the rate-limited REST API.
-// If latest.json returns 404 and GH_TOKEN/GITHUB_TOKEN is set, it falls back once to the GitHub API.
+// FetchLatestBabeRelease fetches latest.json without the REST API, falling back once to api.github.com on 404 if GH_TOKEN or GITHUB_TOKEN is set.
 func FetchLatestBabeRelease(ctx context.Context) (*GitHubRelease, error) {
 	manifest, err := FetchLatestManifest(ctx)
 	if err == nil {
@@ -92,7 +89,6 @@ func fetchLatestFromGitHubAPI(ctx context.Context, apiURL, token string, client 
 	return &rel, nil
 }
 
-// FindAssetForPlatform locates the matching binary asset for the specified OS and architecture.
 func FindAssetForPlatform(release *GitHubRelease, goos, goarch string) (*GitHubAsset, error) {
 	if release == nil {
 		return nil, fmt.Errorf("release metadata is nil")
@@ -109,7 +105,6 @@ func FindAssetForPlatform(release *GitHubRelease, goos, goarch string) (*GitHubA
 		}
 	}
 
-	// Fallback if naming omits version tag prefix
 	genericName := fmt.Sprintf("babe-%s-%s%s", goos, goarch, ext)
 	for i := range release.Assets {
 		if strings.EqualFold(release.Assets[i].Name, genericName) {
@@ -120,8 +115,6 @@ func FindAssetForPlatform(release *GitHubRelease, goos, goarch string) (*GitHubA
 	return nil, fmt.Errorf("no release asset found for platform %s/%s (expected %s)", goos, goarch, expectedName)
 }
 
-// ApplyBabeUpdate validates the asset URL and SHA-256 checksum, downloads the binary,
-// verifies size and hash, and atomically replaces the running executable.
 func ApplyBabeUpdate(ctx context.Context, asset *GitHubAsset, expectedSHA256 string, onProgress ProgressFunc) (string, error) {
 	if asset == nil {
 		return "", fmt.Errorf("release asset is nil")

@@ -11,7 +11,6 @@ import (
 	"os"
 )
 
-// represents supported cryptographic hash algorithms.
 type Algorithm string
 
 const (
@@ -20,14 +19,12 @@ const (
 	SHA256 Algorithm = "SHA256"
 )
 
-// holds MD5, SHA1, and SHA256 hexadecimal digests computed in a single pass.
 type MultiDigest struct {
 	MD5    string `json:"md5"`
 	SHA1   string `json:"sha1"`
 	SHA256 string `json:"sha256"`
 }
 
-// computes MD5, SHA1, and SHA256 digests of a file in a single streaming read.
 func CalculateAllFileHashes(filePath string) (MultiDigest, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -38,7 +35,6 @@ func CalculateAllFileHashes(filePath string) (MultiDigest, error) {
 	return CalculateAllReaderHashes(file)
 }
 
-// computes MD5, SHA1, and SHA256 digests from an io.Reader in one pass.
 func CalculateAllReaderHashes(r io.Reader) (MultiDigest, error) {
 	hMD5 := md5.New()
 	hSHA1 := sha1.New()
@@ -57,7 +53,6 @@ func CalculateAllReaderHashes(r io.Reader) (MultiDigest, error) {
 	}, nil
 }
 
-// computes the hexadecimal hash digest of a file using streaming I/O.
 func CalculateFileHash(filePath string, algo Algorithm) (string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -68,7 +63,6 @@ func CalculateFileHash(filePath string, algo Algorithm) (string, error) {
 	return CalculateReaderHash(file, algo)
 }
 
-// computes the hash digest from an arbitrary io.Reader stream.
 func CalculateReaderHash(r io.Reader, algo Algorithm) (string, error) {
 	var h hash.Hash
 

@@ -13,7 +13,6 @@ import (
 	"github.com/A7E28/babe/internal/platform"
 )
 
-// describes the current global installation state of babe.
 type BabeInstallStatus struct {
 	CurrentExecutable string `json:"current_executable"`
 	CanonicalBinDir   string `json:"canonical_bin_dir"`
@@ -24,7 +23,6 @@ type BabeInstallStatus struct {
 	InPath            bool   `json:"in_path"`
 }
 
-// summarizes the actions taken during SetupBabe.
 type SetupResult struct {
 	TargetBinDir     string `json:"target_bin_dir"`
 	TargetBinPath    string `json:"target_bin_path"`
@@ -34,7 +32,6 @@ type SetupResult struct {
 	PathAlreadySet   bool   `json:"path_already_set"`
 }
 
-// inspects whether babe is installed in the canonical user bin directory and registered in PATH.
 func GetBabeInstallStatus(pm platform.PlatformManager) (*BabeInstallStatus, error) {
 	exePath, err := os.Executable()
 	if err != nil {
@@ -82,7 +79,6 @@ func GetBabeInstallStatus(pm platform.PlatformManager) (*BabeInstallStatus, erro
 	return status, nil
 }
 
-// installs the running babe binary into the canonical user bin directory and ensures PATH registration.
 func SetupBabe(pm platform.PlatformManager, force bool) (*SetupResult, error) {
 	status, err := GetBabeInstallStatus(pm)
 	if err != nil {

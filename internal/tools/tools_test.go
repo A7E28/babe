@@ -51,7 +51,6 @@ func TestExtractZip(t *testing.T) {
 		t.Fatalf("ExtractZip failed: %v", err)
 	}
 
-	// Verify extracted file
 	content, err := os.ReadFile(filepath.Join(destDir, "testdir", "file1.txt"))
 	if err != nil {
 		t.Fatalf("failed to read extracted file: %v", err)
@@ -65,7 +64,6 @@ func TestExtractZip_ZipSlipProtection(t *testing.T) {
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
 
-	// Create a malicious relative path entry
 	w, err := zw.Create("../malicious.txt")
 	if err != nil {
 		t.Fatalf("failed to create entry: %v", err)

@@ -13,13 +13,11 @@ import (
 
 const DefaultUpdateCheckTTL = 12 * time.Hour
 
-// UpdateCheckCache stores the last remote latest-version check timestamp and tag.
 type UpdateCheckCache struct {
 	CheckedAt     time.Time `json:"checked_at"`
 	LatestVersion string    `json:"latest_version"`
 }
 
-// UpdateCheckCachePath returns the OS-appropriate user cache file path for babe update checks.
 func UpdateCheckCachePath() (string, error) {
 	base, err := os.UserCacheDir()
 	if err != nil {
@@ -28,7 +26,6 @@ func UpdateCheckCachePath() (string, error) {
 	return filepath.Join(base, "babe", "update-check.json"), nil
 }
 
-// ReadUpdateCache reads and decodes the update check cache file.
 func ReadUpdateCache(path string) (*UpdateCheckCache, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -45,7 +42,6 @@ func ReadUpdateCache(path string) (*UpdateCheckCache, error) {
 	return &c, nil
 }
 
-// WriteUpdateCache atomically writes the update check cache using a temp file and rename.
 func WriteUpdateCache(path string, c UpdateCheckCache) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -81,8 +77,7 @@ func WriteUpdateCache(path string, c UpdateCheckCache) error {
 	return os.Rename(tmpPath, path)
 }
 
-// CheckForUpdateCached checks whether a newer babe release exists using a local TTL cache.
-// On cache miss/expiry it queries latest.json with no api.github.com fallback.
+// CheckForUpdateCached checks for a newer release using a local TTL cache, querying latest.json on miss/expiry with no api.github.com fallback.
 func CheckForUpdateCached(ctx context.Context, currentVersion, cachePath string, ttl time.Duration) (string, bool, error) {
 	client := newValidatedHTTPClient(2*time.Second, ValidateAssetURL)
 	return checkForUpdateCachedWithClient(ctx, currentVersion, cachePath, babeLatestManifestURL, ttl, client)
@@ -116,7 +111,6 @@ func checkForUpdateCachedWithClient(ctx context.Context, currentVersion, cachePa
 	return manifest.TagName, CompareVersions(currentVersion, manifest.TagName) < 0, nil
 }
 
-// RecordLatestVersionCache best-effort updates the local update-check cache with a newly fetched version.
 func RecordLatestVersionCache(latestVersion string) {
 	latestVersion = strings.TrimSpace(latestVersion)
 	if latestVersion == "" {

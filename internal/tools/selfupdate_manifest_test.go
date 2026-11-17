@@ -173,7 +173,6 @@ func TestCheckForUpdateCached(t *testing.T) {
 
 	cachePath := filepath.Join(t.TempDir(), "babe", "update-check.json")
 
-	// 1. Missing cache -> fetches remote and populates cache
 	latest, avail, err := checkForUpdateCachedWithClient(context.Background(), "v0.4.0", cachePath, srv.URL, 24*time.Hour, srv.Client())
 	if err != nil || !avail || latest != "v0.5.0" {
 		t.Fatalf("unexpected first check result: latest=%q avail=%v err=%v", latest, avail, err)
@@ -182,7 +181,6 @@ func TestCheckForUpdateCached(t *testing.T) {
 		t.Fatalf("expected 1 HTTP hit, got %d", hits.Load())
 	}
 
-	// 2. Fresh cache -> zero HTTP calls
 	latest, avail, err = checkForUpdateCachedWithClient(context.Background(), "v0.4.0", cachePath, srv.URL, 24*time.Hour, srv.Client())
 	if err != nil || !avail || latest != "v0.5.0" {
 		t.Fatalf("unexpected cached check result: latest=%q avail=%v err=%v", latest, avail, err)
@@ -191,7 +189,6 @@ func TestCheckForUpdateCached(t *testing.T) {
 		t.Fatalf("expected 0 extra HTTP hits on fresh cache, got %d total", hits.Load())
 	}
 
-	// 3. Corrupt cache JSON -> silently ignored and refetched
 	if err := os.WriteFile(cachePath, []byte("{corrupt"), 0644); err != nil {
 		t.Fatalf("write corrupt cache: %v", err)
 	}
@@ -203,7 +200,6 @@ func TestCheckForUpdateCached(t *testing.T) {
 		t.Fatalf("expected refetch after corrupt cache, got %d hits", hits.Load())
 	}
 
-	// 4. dev version -> skipped with zero HTTP hits
 	_, avail, err = checkForUpdateCachedWithClient(context.Background(), "dev", cachePath, srv.URL, 24*time.Hour, srv.Client())
 	if err != nil || avail || hits.Load() != 2 {
 		t.Fatalf("expected dev version to skip update check, got avail=%v err=%v hits=%d", avail, err, hits.Load())

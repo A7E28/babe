@@ -38,25 +38,21 @@ type DeviceInfo struct {
 	MaxDownloadSize   string `json:"max_download_size,omitempty"`
 }
 
-// Client wraps fastboot binary execution and output parsing.
 type Client struct {
 	mu             sync.RWMutex
 	fastbootBinary string
 }
 
-// NewClient creates a Fastboot client, searching system PATH and managed directories.
 func NewClient() *Client {
 	return &Client{fastbootBinary: resolveFastbootBinary("fastboot")}
 }
 
-// SetBinaryPath allows overriding the fastboot executable path.
 func (c *Client) SetBinaryPath(path string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.fastbootBinary = path
 }
 
-// BinaryPath returns the resolved fastboot executable path.
 func (c *Client) BinaryPath() string {
 	c.mu.RLock()
 	cur := c.fastbootBinary
@@ -110,7 +106,6 @@ func resolveFastbootBinary(current string) string {
 	return "fastboot"
 }
 
-// Execute runs a fastboot command and returns combined stdout and stderr.
 func (c *Client) Execute(ctx context.Context, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, c.BinaryPath(), args...)
 	var combined bytes.Buffer
@@ -126,7 +121,6 @@ func (c *Client) Execute(ctx context.Context, args ...string) (string, error) {
 	return strings.TrimSpace(combined.String()), nil
 }
 
-// ExecuteOnDevice runs a fastboot command targeting a specific device serial.
 func (c *Client) ExecuteOnDevice(ctx context.Context, serial string, args ...string) (string, error) {
 	if serial != "" {
 		args = append([]string{"-s", serial}, args...)
@@ -134,7 +128,6 @@ func (c *Client) ExecuteOnDevice(ctx context.Context, serial string, args ...str
 	return c.Execute(ctx, args...)
 }
 
-// GetConnectedDevices returns all devices listed by `fastboot devices`.
 func (c *Client) GetConnectedDevices(ctx context.Context) ([]Device, error) {
 	out, err := c.Execute(ctx, "devices")
 	if err != nil {
@@ -143,7 +136,6 @@ func (c *Client) GetConnectedDevices(ctx context.Context) ([]Device, error) {
 	return ParseDevicesOutput(out), nil
 }
 
-// ParseDevicesOutput parses `fastboot devices` output lines.
 func ParseDevicesOutput(output string) []Device {
 	var devices []Device
 	for _, line := range strings.Split(output, "\n") {
@@ -154,7 +146,6 @@ func ParseDevicesOutput(output string) []Device {
 	return devices
 }
 
-// GetDeviceInfo queries `fastboot getvar all` and extracts key bootloader variables.
 func (c *Client) GetDeviceInfo(ctx context.Context, serial string) (*DeviceInfo, error) {
 	out, err := c.ExecuteOnDevice(ctx, serial, "getvar", "all")
 	if err != nil && out == "" {
@@ -163,7 +154,6 @@ func (c *Client) GetDeviceInfo(ctx context.Context, serial string) (*DeviceInfo,
 	return ParseGetvarAll(out, serial), nil
 }
 
-// ParseGetvarAll parses `(bootloader) key: value` lines from `fastboot getvar all`.
 func ParseGetvarAll(output, serial string) *DeviceInfo {
 	vars := make(map[string]string)
 	for _, line := range strings.Split(output, "\n") {
@@ -190,7 +180,6 @@ func ParseGetvarAll(output, serial string) *DeviceInfo {
 	}
 }
 
-// SetActiveSlot switches the active A/B boot slot ("a" or "b").
 func (c *Client) SetActiveSlot(ctx context.Context, serial, slot string) error {
 	clean := strings.ToLower(strings.TrimSpace(slot))
 	if clean != "a" && clean != "b" {
@@ -200,7 +189,7 @@ func (c *Client) SetActiveSlot(ctx context.Context, serial, slot string) error {
 	return err
 }
 
-// FlashPartition verifies the image file, computes its SHA-256 digest, and flashes it to the target partition.
+// FlashPartition flashes imagePath to partition and returns the image's SHA-256 hex digest.
 func (c *Client) FlashPartition(ctx context.Context, serial, partition, imagePath string) (string, error) {
 	partition = strings.TrimSpace(partition)
 	if partition == "" {

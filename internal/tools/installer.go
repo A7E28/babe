@@ -20,7 +20,6 @@ const (
 	DarwinPlatformToolsURL  = "https://dl.google.com/android/repository/platform-tools-latest-darwin.zip"
 )
 
-// returns the official Google SDK platform-tools URL for the current operating system.
 func GetPlatformToolsURL() (string, error) {
 	switch runtime.GOOS {
 	case "windows":
@@ -34,7 +33,6 @@ func GetPlatformToolsURL() (string, error) {
 	}
 }
 
-// downloads Google Platform-Tools, verifies its integrity, and adds it to PATH.
 func DownloadAndConfigurePlatformTools(ctx context.Context, customURL, expectedChecksum string, onProgress ProgressFunc) (string, error) {
 	downloadURL := customURL
 	if downloadURL == "" {
@@ -63,7 +61,6 @@ func DownloadAndConfigurePlatformTools(ctx context.Context, customURL, expectedC
 		return "", fmt.Errorf("download platform-tools: %w", err)
 	}
 
-	// Plausibility check (> 5MB)
 	fi, err := os.Stat(zipFile)
 	if err != nil || fi.Size() < 5*1024*1024 {
 		return "", fmt.Errorf("downloaded zip archive appears truncated or invalid")
@@ -80,10 +77,9 @@ func DownloadAndConfigurePlatformTools(ctx context.Context, customURL, expectedC
 		return "", fmt.Errorf("create parent directory %s: %w", parentDir, err)
 	}
 
-	// stop any running ADB server before replacing binaries (prevents Windows file locks)
+	// Stop running ADB server before replacing binaries to avoid Windows file locks.
 	stopRunningADB(targetDir)
 
-	// clean existing target if present before extracting new version
 	if err := os.RemoveAll(targetDir); err != nil {
 		return "", fmt.Errorf("remove existing installation at %s: %w", targetDir, err)
 	}
@@ -92,7 +88,6 @@ func DownloadAndConfigurePlatformTools(ctx context.Context, customURL, expectedC
 		return "", fmt.Errorf("extract platform-tools: %w", err)
 	}
 
-	// update current process PATH so interactive sessions immediately resolve adb/fastboot
 	_ = os.Setenv("PATH", targetDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	if err := pm.AddToPath(targetDir); err != nil && err != platform.ErrPathAlreadyExists {

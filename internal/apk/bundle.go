@@ -12,14 +12,12 @@ import (
 	"github.com/A7E28/babe/internal/device"
 )
 
-// InstallAuto installs either a single .apk or a Split APK bundle (.apks, .xapk, .apkm) onto a device.
 func InstallAuto(ctx context.Context, client *device.Client, serial, archivePath string, opts InstallOptions) error {
 	lower := strings.ToLower(archivePath)
 	if strings.HasSuffix(lower, ".apks") || strings.HasSuffix(lower, ".xapk") || strings.HasSuffix(lower, ".apkm") {
 		return InstallBundle(ctx, client, serial, archivePath, opts)
 	}
 
-	// Also inspect if a generic file is a bundle containing split APKs
 	if info, err := InspectArchive(archivePath); err == nil && info.IsBundle {
 		return InstallBundle(ctx, client, serial, archivePath, opts)
 	}
@@ -27,7 +25,6 @@ func InstallAuto(ctx context.Context, client *device.Client, serial, archivePath
 	return Install(ctx, client, serial, archivePath, opts)
 }
 
-// InstallBundle extracts split APKs from a bundle archive and installs them via `adb install-multiple`.
 func InstallBundle(ctx context.Context, client *device.Client, serial, bundlePath string, opts InstallOptions) error {
 	zr, err := zip.OpenReader(bundlePath)
 	if err != nil {
@@ -84,7 +81,7 @@ func InstallBundle(ctx context.Context, client *device.Client, serial, bundlePat
 	return nil
 }
 
-// PackSplitBundle packages multiple split APK files into a single .apks zip archive using Store compression.
+// PackSplitBundle packages split APKs into a .apks zip archive using Store compression.
 func PackSplitBundle(splitPaths []string, bundlePath string) (retErr error) {
 	outFile, err := os.OpenFile(bundlePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {

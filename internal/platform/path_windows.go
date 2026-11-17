@@ -111,7 +111,7 @@ func (w *windowsPlatformManager) AddToPath(dir string) error {
 	}
 	defer k.Close()
 
-	// Crucial: preserve REG_EXPAND_SZ so %USERPROFILE% etc. stay expandable!
+	// Preserve REG_EXPAND_SZ so %USERPROFILE% stays expandable.
 	if valType == registry.SZ {
 		err = k.SetStringValue("Path", newPath)
 	} else {

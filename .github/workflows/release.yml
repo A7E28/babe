@@ -131,7 +131,6 @@ jobs:
               json.dump(manifest, f, indent=2)
               f.write("\n")
 
-          # Validate written latest.json
           with open("latest.json", "r", encoding="utf-8") as f:
               loaded = json.load(f)
 

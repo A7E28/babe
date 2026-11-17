@@ -16,7 +16,6 @@ const (
 	LevelFatal
 )
 
-// returns the single-letter logcat tag.
 func (l Level) String() string {
 	switch l {
 	case LevelVerbose:
@@ -36,12 +35,11 @@ func (l Level) String() string {
 	}
 }
 
-// MarshalJSON encodes Level as its single-letter logcat tag.
 func (l Level) MarshalJSON() ([]byte, error) {
 	return json.Marshal(l.String())
 }
 
-// converts a string into a Level, defaulting to LevelVerbose.
+// ParseLevel parses a logcat level string, defaulting to LevelVerbose.
 func ParseLevel(s string) Level {
 	lvl, err := ValidateLevel(s)
 	if err != nil {
@@ -50,7 +48,6 @@ func ParseLevel(s string) Level {
 	return lvl
 }
 
-// parses and validates a logcat level string (V, D, I, W, E, F).
 func ValidateLevel(s string) (Level, error) {
 	switch strings.ToUpper(strings.TrimSpace(s)) {
 	case "", "V", "VERBOSE":
@@ -78,7 +75,6 @@ func (e *InvalidLevelError) Error() string {
 	return "invalid log level \"" + e.Input + "\" (valid: V, D, I, W, E, F)"
 }
 
-// represents a parsed logcat log record.
 type Entry struct {
 	Raw     string `json:"raw"`
 	Time    string `json:"time,omitempty"`
@@ -88,9 +84,9 @@ type Entry struct {
 	Message string `json:"message"`
 }
 
-// parses a standard "-v time" logcat line:
-// format: "10-31 00:15:32.123 D/Tag( 1234): Message"
-// or:     "10-31 00:15:32.123  1234  5678 D Tag     : Message"
+// ParseLine parses "-v time" and "-v threadtime" logcat lines:
+// "10-31 00:15:32.123 D/Tag( 1234): Message"
+// "10-31 00:15:32.123  1234  5678 D Tag     : Message"
 func ParseLine(raw string) Entry {
 	entry := Entry{Raw: raw, Level: LevelVerbose}
 	trimmed := strings.TrimSpace(raw)

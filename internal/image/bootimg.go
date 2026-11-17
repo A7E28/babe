@@ -11,7 +11,6 @@ import (
 
 const BootMagic = "ANDROID!"
 
-// holds metadata extracted from an Android boot.img or init_boot.img header.
 type BootImageInfo struct {
 	FilePath      string `json:"file_path"`
 	FileSize      int64  `json:"file_size"`
@@ -26,7 +25,6 @@ type BootImageInfo struct {
 	Cmdline       string `json:"cmdline,omitempty"`
 }
 
-// parses an Android boot.img or init_boot.img file header (versions 0 to 4).
 func InspectBootImage(filePath string) (*BootImageInfo, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -48,7 +46,6 @@ func InspectBootImage(filePath string) (*BootImageInfo, error) {
 	return info, nil
 }
 
-// reads and decodes the binary Android boot image header from r.
 func ParseBootImageHeader(r io.Reader) (*BootImageInfo, error) {
 	buf := make([]byte, 2048)
 	if _, err := io.ReadFull(r, buf); err != nil {
@@ -93,7 +90,7 @@ func ParseBootImageHeader(r io.Reader) (*BootImageInfo, error) {
 	return info, nil
 }
 
-// unpacks the 32-bit Android boot image os_version field:
+// decodeOSVersion unpacks the 32-bit Android boot image os_version field:
 // top 21 bits: A (7 bits), B (7 bits), C (7 bits).
 // bottom 11 bits: Y (7 bits, offset from 2000), M (4 bits).
 func decodeOSVersion(raw uint32) (version string, patch string) {

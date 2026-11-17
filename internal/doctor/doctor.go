@@ -14,7 +14,6 @@ import (
 	"github.com/A7E28/babe/internal/platform"
 )
 
-// Status represents the health level of a diagnostic check.
 type Status string
 
 const (
@@ -23,7 +22,6 @@ const (
 	StatusError Status = "ERROR"
 )
 
-// CheckResult describes a single diagnostic inspection item.
 type CheckResult struct {
 	Name    string `json:"name"`
 	Status  Status `json:"status"`
@@ -31,7 +29,6 @@ type CheckResult struct {
 	Remedy  string `json:"remedy,omitempty"`
 }
 
-// FindExecutablesInPath scans a PATH string and returns all matching executable paths in resolution order.
 func FindExecutablesInPath(binBaseName, pathEnv string) []string {
 	binName := binBaseName
 	if runtime.GOOS == "windows" && !strings.HasSuffix(strings.ToLower(binName), ".exe") {
@@ -61,7 +58,6 @@ func FindExecutablesInPath(binBaseName, pathEnv string) []string {
 	return found
 }
 
-// RunDiagnostics executes a comprehensive suite of host, toolchain, PATH, and USB device checks.
 func RunDiagnostics(ctx context.Context, adbClient *device.Client, fbClient *fastboot.Client, pm platform.PlatformManager) []CheckResult {
 	results := make([]CheckResult, 0, 6)
 	pathEnv := os.Getenv("PATH")
