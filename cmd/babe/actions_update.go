@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -13,17 +15,19 @@ import (
 	"github.com/A7E28/babe/internal/ui"
 )
 
-func runBabeSetup(pm platform.PlatformManager, force, statusOnly bool) {
-	ui.Section("babe Environment Setup")
+func runBabeSetup(w io.Writer, pm platform.PlatformManager, force, statusOnly bool) error {
+	if w == nil {
+		w = os.Stdout
+	}
 
 	if statusOnly {
 		status, err := tools.GetBabeInstallStatus(pm)
 		if err != nil {
-			ui.Error("Failed to inspect installation status: %v", err)
-			return
+			return fmt.Errorf("failed to inspect installation status: %w", err)
 		}
-		fmt.Printf("  %-18s %s\n", ui.Gray("Running Binary:"), status.CurrentExecutable)
-		fmt.Printf("  %-18s %s\n", ui.Gray("Canonical Path:"), status.CanonicalBinPath)
+		ui.Section("babe Environment Setup")
+		fmt.Fprintf(w, "  %-18s %s\n", ui.Gray("Running Binary:"), status.CurrentExecutable)
+		fmt.Fprintf(w, "  %-18s %s\n", ui.Gray("Canonical Path:"), status.CanonicalBinPath)
 		if status.BinaryInstalled && status.UpToDate {
 			ui.Success("Canonical binary is installed and matches running version.")
 		} else if status.BinaryInstalled {
@@ -36,19 +40,22 @@ func runBabeSetup(pm platform.PlatformManager, force, statusOnly bool) {
 		} else {
 			ui.Warn("Directory %s is not in user PATH (run 'babe setup').", status.CanonicalBinDir)
 		}
-		return
+		return nil
 	}
 
 	res, err := tools.SetupBabe(pm, force)
 	if err != nil {
-		ui.Error("Setup failed: %v", err)
-		return
+		if res != nil && res.BinaryUpdated {
+			return fmt.Errorf("installed babe binary at %s, but setup failed: %w", res.TargetBinPath, err)
+		}
+		return fmt.Errorf("setup failed: %w", err)
 	}
 
+	ui.Section("babe Environment Setup")
 	if res.AlreadyInstalled && res.PathAlreadySet {
 		ui.Success("babe is already installed and configured in PATH.")
 		ui.Info("Location: %s", res.TargetBinPath)
-		return
+		return nil
 	}
 
 	if res.BinaryUpdated {
@@ -63,33 +70,36 @@ func runBabeSetup(pm platform.PlatformManager, force, statusOnly bool) {
 	} else if res.PathAlreadySet {
 		ui.Success("User PATH already contains %s.", res.TargetBinDir)
 	}
+	return nil
 }
 
-func runSelfUpdate(force, checkOnly bool) {
+func runSelfUpdate(w io.Writer, force, checkOnly bool) error {
+	if w == nil {
+		w = os.Stdout
+	}
 	ui.Section("babe Self-Update")
-	fmt.Println("Checking for latest release on GitHub...")
+	fmt.Fprintln(w, "Checking for latest release on GitHub...")
 
 	var lastPct int64 = -1
 	var startedDownload bool
 	report, err := executeSelfUpdate(force, checkOnly, func(latest, asset string) {
-		fmt.Printf("Updating babe %s -> %s (%s)...\n", version, latest, asset)
+		fmt.Fprintf(w, "Updating babe %s -> %s (%s)...\n", version, latest, asset)
 	}, func(cur, tot int64) {
 		startedDownload = true
 		if tot > 0 {
 			if pct := (cur * 100) / tot; pct != lastPct {
 				lastPct = pct
-				fmt.Printf("\rDownloading: %3d%% [%d / %d KB]", pct, cur/1024, tot/1024)
+				fmt.Fprintf(w, "\rDownloading: %3d%% [%d / %d KB]", pct, cur/1024, tot/1024)
 			}
 		} else {
-			fmt.Printf("\rDownloading: %d KB", cur/1024)
+			fmt.Fprintf(w, "\rDownloading: %d KB", cur/1024)
 		}
 	})
 	if startedDownload {
-		fmt.Println()
+		fmt.Fprintln(w)
 	}
 	if err != nil {
-		ui.Error("%v", err)
-		return
+		return err
 	}
 
 	if checkOnly {
@@ -99,13 +109,13 @@ func runSelfUpdate(force, checkOnly bool) {
 		} else {
 			ui.Success("babe is up to date (%s).", report.CurrentVersion)
 		}
-		return
+		return nil
 	}
 
 	if !report.UpdateAvailable && !force {
 		ui.Success("babe is already up to date: %s", report.CurrentVersion)
 		ui.Info("Latest release: %s", report.LatestVersion)
-		return
+		return nil
 	}
 
 	if report.Warning != "" {
@@ -116,6 +126,7 @@ func runSelfUpdate(force, checkOnly bool) {
 
 	ui.Success("Successfully updated babe to %s!", report.LatestVersion)
 	ui.Info("Binary updated at: %s", report.Path)
+	return nil
 }
 
 func runSelfUpdateInteractive(reader *bufio.Reader) {
@@ -123,9 +134,8 @@ func runSelfUpdateInteractive(reader *bufio.Reader) {
 	fmt.Println("Checking for latest release on GitHub...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-
 	release, err := tools.FetchLatestBabeRelease(ctx)
+	cancel()
 	if err != nil {
 		ui.Error("Failed to check for updates: %v", err)
 		return
@@ -156,5 +166,7 @@ func runSelfUpdateInteractive(reader *bufio.Reader) {
 		}
 	}
 
-	runSelfUpdate(force, false)
+	if err := runSelfUpdate(os.Stdout, force, false); err != nil {
+		ui.Error("%v", err)
+	}
 }

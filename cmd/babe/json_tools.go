@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -41,7 +42,7 @@ func collectToolsStatus(client *device.Client, pm platform.PlatformManager) (*to
 	}, nil
 }
 
-func executeToolsUpdate(client *device.Client, force, checkOnly bool, onProgress func(cur, tot int64)) (*updateReport, error) {
+func executeToolsUpdate(client *device.Client, force, checkOnly bool, onWarn func(string), onProgress func(cur, tot int64)) (*updateReport, error) {
 	ctx := context.Background()
 	checkCtx, cancelCheck := context.WithTimeout(ctx, 3*time.Second)
 	details := client.GetInstallationDetails(checkCtx)
@@ -75,9 +76,15 @@ func executeToolsUpdate(client *device.Client, force, checkOnly bool, onProgress
 	if err != nil {
 		if details.Installed && !force {
 			report.Warning = fmt.Sprintf("could not check remote repository: %v", err)
+			if onWarn != nil {
+				onWarn(report.Warning)
+			}
 			return report, nil
 		}
 		report.Warning = fmt.Sprintf("could not query release metadata: %v", err)
+		if onWarn != nil {
+			onWarn(report.Warning)
+		}
 	}
 
 	if details.Installed && release != nil && !force && !report.UpdateAvailable {
@@ -92,6 +99,12 @@ func executeToolsUpdate(client *device.Client, force, checkOnly bool, onProgress
 
 	configuredPath, err := tools.DownloadAndConfigurePlatformTools(ctx, downloadURL, expectedChecksum, onProgress)
 	if err != nil {
+		if configuredPath != "" {
+			client.SetBinaryPath("adb")
+			report.Updated = true
+			report.Path = configuredPath
+			return report, fmt.Errorf("platform-tools binaries installed at %s: %w", configuredPath, err)
+		}
 		return nil, fmt.Errorf("download platform-tools: %w", err)
 	}
 
@@ -102,10 +115,9 @@ func executeToolsUpdate(client *device.Client, force, checkOnly bool, onProgress
 }
 
 func executeSelfUpdate(force, checkOnly bool, onStart func(latest, asset string), onProgress func(cur, tot int64)) (*updateReport, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-
-	release, err := tools.FetchLatestBabeRelease(ctx)
+	apiCtx, cancelAPI := context.WithTimeout(context.Background(), 20*time.Second)
+	release, err := tools.FetchLatestBabeRelease(apiCtx)
+	cancelAPI()
 	if err != nil {
 		return nil, fmt.Errorf("check for updates: %w", err)
 	}
@@ -130,16 +142,22 @@ func executeSelfUpdate(force, checkOnly bool, onStart func(latest, asset string)
 		onStart(release.TagName, asset.Name)
 	}
 
-	checksums, err := tools.FetchReleaseChecksums(ctx, release)
-	expectedSHA := ""
+	sumCtx, cancelSum := context.WithTimeout(context.Background(), 20*time.Second)
+	checksums, err := tools.FetchReleaseChecksums(sumCtx, release)
+	cancelSum()
 	if err != nil {
-		report.Warning = fmt.Sprintf("could not fetch release checksums: %v", err)
-	} else {
-		expectedSHA = checksums[asset.Name]
+		return nil, fmt.Errorf("fetch release checksums: %w", err)
+	}
+	expectedSHA, ok := tools.LookupChecksum(checksums, asset.Name)
+	if !ok || strings.TrimSpace(expectedSHA) == "" {
+		return nil, fmt.Errorf("release %s is missing SHA-256 checksum for %s", release.TagName, asset.Name)
 	}
 	report.SHA256 = expectedSHA
 
-	appliedPath, err := tools.ApplyBabeUpdate(ctx, asset, expectedSHA, onProgress)
+	dlCtx, cancelDL := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancelDL()
+
+	appliedPath, err := tools.ApplyBabeUpdate(dlCtx, asset, expectedSHA, onProgress)
 	if err != nil {
 		return nil, fmt.Errorf("self-update failed: %w", err)
 	}
@@ -168,13 +186,16 @@ func handleSetupJSON(cmd *cobra.Command, pm platform.PlatformManager, force, sta
 
 	res, err := tools.SetupBabe(pm, force)
 	if err != nil {
+		if res != nil && res.BinaryUpdated {
+			return fmt.Errorf("installed babe binary at %s, but setup failed: %w", res.TargetBinPath, err)
+		}
 		return fmt.Errorf("setup failed: %w", err)
 	}
 	return writeJSON(cmd.OutOrStdout(), res)
 }
 
 func handleUpdateToolsJSON(cmd *cobra.Command, client *device.Client, force, checkOnly bool) error {
-	report, err := executeToolsUpdate(client, force, checkOnly, nil)
+	report, err := executeToolsUpdate(client, force, checkOnly, nil, nil)
 	if err != nil {
 		return err
 	}

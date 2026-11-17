@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -51,35 +53,52 @@ func platformToolsMenu(client *device.Client, pm platform.PlatformManager, reade
 	}
 	switch input {
 	case "1":
-		checkPlatformTools(client, pm)
-		runBabeSetup(pm, false, true)
+		if err := checkPlatformTools(os.Stdout, client, pm); err != nil {
+			ui.Error("%v", err)
+			return
+		}
+		if err := runBabeSetup(os.Stdout, pm, false, true); err != nil {
+			ui.Error("%v", err)
+		}
 	case "2":
-		downloadOrUpdatePlatformTools(client, pm, false, false)
+		if err := downloadOrUpdatePlatformTools(os.Stdout, client, pm, false, false); err != nil {
+			ui.Error("%v", err)
+		}
 	case "3":
 		runSelfUpdateInteractive(reader)
 	case "4":
-		runBabeSetup(pm, false, false)
+		if err := runBabeSetup(os.Stdout, pm, false, false); err != nil {
+			ui.Error("%v", err)
+		}
 	}
 }
 
-func checkPlatformTools(client *device.Client, pm platform.PlatformManager) {
-	ui.Section("Platform-Tools Status")
+func checkPlatformTools(w io.Writer, client *device.Client, pm platform.PlatformManager) error {
+	if w == nil {
+		w = os.Stdout
+	}
 	report, err := collectToolsStatus(client, pm)
 	if err != nil {
-		ui.Error("%v", err)
-		return
+		return err
 	}
+	ui.Section("Platform-Tools Status")
 	pt := report.PlatformTools
 	ui.RenderADBStatus(pt.Installed, pt.Version, pt.BinaryPath, pt.InstallDir, pt.InPath)
+	return nil
 }
 
-func downloadOrUpdatePlatformTools(client *device.Client, pm platform.PlatformManager, force, checkOnly bool) {
+func downloadOrUpdatePlatformTools(w io.Writer, client *device.Client, pm platform.PlatformManager, force, checkOnly bool) error {
+	if w == nil {
+		w = os.Stdout
+	}
 	ui.Section("Download or Update Platform-Tools")
-	fmt.Println("Checking for latest platform-tools release...")
+	fmt.Fprintln(w, "Checking for latest platform-tools release...")
 
 	var lastPercent int64 = -1
 	var startedDownload bool
-	report, err := executeToolsUpdate(client, force, checkOnly, func(current, total int64) {
+	report, err := executeToolsUpdate(client, force, checkOnly, func(msg string) {
+		ui.Warn("%s", msg)
+	}, func(current, total int64) {
 		if !startedDownload {
 			startedDownload = true
 			ui.Info("Downloading Google Android Platform-Tools...")
@@ -87,18 +106,17 @@ func downloadOrUpdatePlatformTools(client *device.Client, pm platform.PlatformMa
 		if total > 0 {
 			if percent := (current * 100) / total; percent != lastPercent {
 				lastPercent = percent
-				fmt.Printf("\rDownloading: %3d%% [%d / %d KB]", percent, current/1024, total/1024)
+				fmt.Fprintf(w, "\rDownloading: %3d%% [%d / %d KB]", percent, current/1024, total/1024)
 			}
 		} else {
-			fmt.Printf("\rDownloading: %d KB", current/1024)
+			fmt.Fprintf(w, "\rDownloading: %d KB", current/1024)
 		}
 	})
 	if startedDownload {
-		fmt.Println()
+		fmt.Fprintln(w)
 	}
 	if err != nil {
-		ui.Error("%v", err)
-		return
+		return err
 	}
 
 	if checkOnly {
@@ -111,25 +129,22 @@ func downloadOrUpdatePlatformTools(client *device.Client, pm platform.PlatformMa
 		} else {
 			ui.Success("Platform-tools is up to date (v%s).", report.CurrentVersion)
 		}
-		return
-	}
-
-	if report.Warning != "" {
-		ui.Warn("%s", report.Warning)
-		if !report.Updated && report.Installed != nil && *report.Installed {
-			ui.Info("Platform-tools v%s is currently installed at:\n     %s", report.CurrentVersion, report.Path)
-			return
-		}
+		return nil
 	}
 
 	if !report.Updated {
+		if report.Warning != "" && report.Installed != nil && *report.Installed {
+			ui.Info("Platform-tools v%s is currently installed at:\n     %s", report.CurrentVersion, report.Path)
+			return nil
+		}
 		ui.Success("Platform-tools is already up to date: v%s", report.CurrentVersion)
-		fmt.Printf("     Binary: %s\n", report.Path)
-		return
+		fmt.Fprintf(w, "     Binary: %s\n", report.Path)
+		return nil
 	}
 
 	ui.Success("Platform-tools configured at:\n     %s", report.Path)
 	ui.Success("System PATH environment updated.")
+	return nil
 }
 
 func selectDevice(client *device.Client, reader *bufio.Reader) (string, error) {

@@ -87,7 +87,7 @@ func handleLogcatCLI(cmd *cobra.Command, client *device.Client, opts logcat.Stre
 			}
 			return
 		}
-		fmt.Println(logcat.Colorize(entry))
+		fmt.Fprintln(outWriter, logcat.Colorize(entry))
 	})
 	if writeErr != nil {
 		return writeErr
@@ -105,19 +105,20 @@ func handleCrashLogCLI(cmd *cobra.Command, client *device.Client, serial, outFil
 	}
 
 	jsonMode := isJSON(cmd)
+	outWriter := cmd.OutOrStdout()
 	entries := []logcat.Entry{}
 	count, err := logcat.DumpCrashLogs(context.Background(), client.BinaryPath(), targetSerial, outFile, func(entry logcat.Entry) {
 		if jsonMode {
 			entries = append(entries, entry)
 			return
 		}
-		fmt.Println(logcat.Colorize(entry))
+		fmt.Fprintln(outWriter, logcat.Colorize(entry))
 	})
 	if err != nil {
 		return fmt.Errorf("crash log dump failed: %w", err)
 	}
 	if jsonMode {
-		return writeJSON(cmd.OutOrStdout(), crashLogReport{
+		return writeJSON(outWriter, crashLogReport{
 			Serial:     targetSerial,
 			Count:      count,
 			OutputFile: outFile,

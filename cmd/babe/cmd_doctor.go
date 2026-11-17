@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -21,6 +20,7 @@ func newDoctorCmd(adbClient *device.Client, fbClient *fastboot.Client, pm platfo
 		Short:   "Run system, PATH conflict & USB diagnostics",
 		Long:    "Run system readiness, PATH shadowing conflicts, and USB device diagnostics.",
 		GroupID: "core",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return handleDoctorCLI(cmd, adbClient, fbClient, pm, fixUdev)
 		},
@@ -52,7 +52,7 @@ func handleDoctorCLI(cmd *cobra.Command, adbClient *device.Client, fbClient *fas
 	ui.RenderDoctorResults(results)
 
 	if fixUdev {
-		fmt.Println()
+		cmd.Println()
 		return handleUdevCLI(cmd)
 	}
 	return nil

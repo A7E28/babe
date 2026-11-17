@@ -13,13 +13,15 @@ func newToolsCmd(client *device.Client, pm platform.PlatformManager) *cobra.Comm
 		Short:   "Manage Android SDK platform-tools (adb and fastboot)",
 		Long:    "Manage Android SDK platform-tools (adb and fastboot).",
 		GroupID: "core",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if isJSON(cmd) {
 				return handleToolsStatusJSON(cmd, client, pm)
 			}
-			checkPlatformTools(client, pm)
-			runBabeSetup(pm, false, true)
-			return nil
+			if err := checkPlatformTools(cmd.OutOrStdout(), client, pm); err != nil {
+				return err
+			}
+			return runBabeSetup(cmd.OutOrStdout(), pm, false, true)
 		},
 	}
 
@@ -32,9 +34,10 @@ func newToolsCmd(client *device.Client, pm platform.PlatformManager) *cobra.Comm
 			if isJSON(cmd) {
 				return handleToolsStatusJSON(cmd, client, pm)
 			}
-			checkPlatformTools(client, pm)
-			runBabeSetup(pm, false, true)
-			return nil
+			if err := checkPlatformTools(cmd.OutOrStdout(), client, pm); err != nil {
+				return err
+			}
+			return runBabeSetup(cmd.OutOrStdout(), pm, false, true)
 		},
 	}
 
@@ -47,8 +50,7 @@ func newToolsCmd(client *device.Client, pm platform.PlatformManager) *cobra.Comm
 			if isJSON(cmd) {
 				return handleUpdateToolsJSON(cmd, client, false, false)
 			}
-			downloadOrUpdatePlatformTools(client, pm, false, false)
-			return nil
+			return downloadOrUpdatePlatformTools(cmd.OutOrStdout(), client, pm, false, false)
 		},
 	}
 
@@ -60,8 +62,7 @@ func newToolsCmd(client *device.Client, pm platform.PlatformManager) *cobra.Comm
 			if isJSON(cmd) {
 				return handleSetupJSON(cmd, pm, false, false)
 			}
-			runBabeSetup(pm, false, false)
-			return nil
+			return runBabeSetup(cmd.OutOrStdout(), pm, false, false)
 		},
 	}
 

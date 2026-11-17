@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -127,15 +128,23 @@ func isJSON(cmd *cobra.Command) bool {
 }
 
 func hasJSONFlag(args []string) bool {
+	jsonMode := false
 	for _, a := range args {
 		if a == "--" {
-			return false
+			break
 		}
-		if a == "--json" || strings.EqualFold(a, "--json=true") {
-			return true
+		if a == "--json" {
+			jsonMode = true
+			continue
+		}
+		if strings.HasPrefix(a, "--json=") {
+			val := strings.TrimPrefix(a, "--json=")
+			if parsed, err := strconv.ParseBool(val); err == nil {
+				jsonMode = parsed
+			}
 		}
 	}
-	return false
+	return jsonMode
 }
 
 func writeJSON(w io.Writer, v any) error {

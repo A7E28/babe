@@ -20,6 +20,7 @@ func newDeviceCmd(client *device.Client) *cobra.Command {
 		Short:   "Manage and inspect connected ADB devices",
 		Long:    "Manage and inspect connected ADB devices.",
 		GroupID: "device",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return handleDeviceListCLI(cmd, client)
 		},
@@ -81,6 +82,7 @@ func newInfoAliasCmd(client *device.Client) *cobra.Command {
 		Use:    "info",
 		Hidden: true,
 		Short:  "Display device hardware, OS, battery & root status",
+		Args:   cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return handleDeviceInfoCLI(cmd, client, serial)
 		},

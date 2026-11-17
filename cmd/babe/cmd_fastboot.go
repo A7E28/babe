@@ -20,6 +20,13 @@ func newFastbootCmd(fbClient *fastboot.Client) *cobra.Command {
 		Short:   "Manage devices in Fastboot / Bootloader mode",
 		Long:    "Manage devices in Fastboot / Bootloader mode.",
 		GroupID: "device",
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if isJSON(cmd) {
+				return fmt.Errorf("subcommand required")
+			}
+			return cmd.Help()
+		},
 	}
 
 	cmd.PersistentFlags().StringVarP(&serial, "serial", "s", "", "Target specific fastboot device serial")
@@ -104,7 +111,7 @@ func newFastbootCmd(fbClient *fastboot.Client) *cobra.Command {
 			partition, imgPath := args[0], args[1]
 			jsonMode := isJSON(cmd)
 			if !jsonMode {
-				fmt.Printf("Verifying SHA256 and flashing %s -> %s on %s...\n", imgPath, partition, target)
+				cmd.Printf("Verifying SHA256 and flashing %s -> %s on %s...\n", imgPath, partition, target)
 			}
 			digest, err := fbClient.FlashPartition(context.Background(), target, partition, imgPath)
 			if !jsonMode && digest != "" {

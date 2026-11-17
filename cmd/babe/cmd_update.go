@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -20,14 +21,25 @@ func newUpdateCmd(client *device.Client, pm platform.PlatformManager) *cobra.Com
 		Short:   "Update Android SDK platform-tools or the babe executable",
 		Long:    "Update Android SDK platform-tools or the babe executable.",
 		GroupID: "core",
+		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if (toolsFlag || selfFlag) && len(args) > 0 {
+				return fmt.Errorf("cannot combine --tools or --self with positional target %q", args[0])
+			}
+			if !toolsFlag && !selfFlag && len(args) == 0 {
+				if isJSON(cmd) {
+					return fmt.Errorf("update target required (valid: tools, self)")
+				}
+				return cmd.Help()
+			}
+
 			target := ""
 			if toolsFlag {
 				target = "tools"
 			} else if selfFlag {
 				target = "self"
-			} else if len(args) > 0 {
-				target = strings.ToLower(strings.TrimLeft(args[0], "-"))
+			} else {
+				target = strings.ToLower(strings.TrimSpace(args[0]))
 			}
 
 			switch target {
@@ -35,16 +47,15 @@ func newUpdateCmd(client *device.Client, pm platform.PlatformManager) *cobra.Com
 				if isJSON(cmd) {
 					return handleUpdateToolsJSON(cmd, client, force, check)
 				}
-				downloadOrUpdatePlatformTools(client, pm, force, check)
+				return downloadOrUpdatePlatformTools(cmd.OutOrStdout(), client, pm, force, check)
 			case "self", "babe":
 				if isJSON(cmd) {
 					return handleSelfUpdateJSON(cmd, force, check)
 				}
-				runSelfUpdate(force, check)
+				return runSelfUpdate(cmd.OutOrStdout(), force, check)
 			default:
-				_ = cmd.Help()
+				return fmt.Errorf("unknown update target %q (valid: tools, self)", args[0])
 			}
-			return nil
 		},
 	}
 
@@ -52,17 +63,18 @@ func newUpdateCmd(client *device.Client, pm platform.PlatformManager) *cobra.Com
 	updateCmd.PersistentFlags().BoolVarP(&check, "check", "c", false, "Check for updates without downloading")
 	updateCmd.Flags().BoolVar(&toolsFlag, "tools", false, "Target platform-tools")
 	updateCmd.Flags().BoolVar(&selfFlag, "self", false, "Target babe self executable")
+	updateCmd.MarkFlagsMutuallyExclusive("tools", "self")
 
 	toolsSubCmd := &cobra.Command{
 		Use:     "tools",
 		Aliases: []string{"platform-tools", "adb", "fastboot"},
 		Short:   "Install or update Google Android platform-tools (adb/fastboot)",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if isJSON(cmd) {
 				return handleUpdateToolsJSON(cmd, client, force, check)
 			}
-			downloadOrUpdatePlatformTools(client, pm, force, check)
-			return nil
+			return downloadOrUpdatePlatformTools(cmd.OutOrStdout(), client, pm, force, check)
 		},
 	}
 
@@ -70,12 +82,12 @@ func newUpdateCmd(client *device.Client, pm platform.PlatformManager) *cobra.Com
 		Use:     "self",
 		Aliases: []string{"babe"},
 		Short:   "Check and update babe executable to latest GitHub release",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if isJSON(cmd) {
 				return handleSelfUpdateJSON(cmd, force, check)
 			}
-			runSelfUpdate(force, check)
-			return nil
+			return runSelfUpdate(cmd.OutOrStdout(), force, check)
 		},
 	}
 

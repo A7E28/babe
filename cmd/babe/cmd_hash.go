@@ -26,7 +26,7 @@ func newHashCmd() *cobra.Command {
 					MultiDigest: digests,
 				})
 			}
-			if err := printFileHashes(args[0]); err != nil {
+			if err := printFileHashes(cmd.OutOrStdout(), args[0]); err != nil {
 				return fmt.Errorf("hash calculation failed: %w", err)
 			}
 			return nil

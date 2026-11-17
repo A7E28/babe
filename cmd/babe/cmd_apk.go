@@ -21,6 +21,13 @@ func newAPKCmd(client *device.Client) *cobra.Command {
 		Short:   "Inspect, install, list, and extract Android packages",
 		Long:    "Inspect, install, list, and extract Android packages.",
 		GroupID: "pkg",
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if isJSON(cmd) {
+				return fmt.Errorf("subcommand required")
+			}
+			return cmd.Help()
+		},
 	}
 
 	cmd.PersistentFlags().StringVarP(&serial, "serial", "s", "", "Target specific device serial (default: auto-detected)")
@@ -142,7 +149,7 @@ func handleInstallCLI(cmd *cobra.Command, client *device.Client, archivePath, se
 
 	jsonMode := isJSON(cmd)
 	if !jsonMode {
-		fmt.Printf("Installing %s on %s...\n", archivePath, targetSerial)
+		cmd.Printf("Installing %s on %s...\n", archivePath, targetSerial)
 	}
 	opts := apk.InstallOptions{Reinstall: true, Downgrade: true, GrantPerm: true}
 	if err := apk.InstallAuto(context.Background(), client, targetSerial, archivePath, opts); err != nil {
@@ -183,7 +190,7 @@ func handlePackagesCLI(cmd *cobra.Command, client *device.Client, serial string,
 		})
 	}
 	for _, p := range matched {
-		fmt.Println(p)
+		cmd.Println(p)
 	}
 	return nil
 }

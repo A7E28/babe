@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/A7E28/babe/internal/image"
@@ -14,11 +16,13 @@ func newImageCmd() *cobra.Command {
 		Short:   "Offline Android boot.img / init_boot.img header parser",
 		Long:    "Offline parser for Android boot.img and init_boot.img headers (v0 through v4).",
 		GroupID: "pkg",
-		Args:    cobra.ArbitraryArgs,
+		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				_ = cmd.Help()
-				return nil
+				if isJSON(cmd) {
+					return fmt.Errorf("image file path required")
+				}
+				return cmd.Help()
 			}
 			return runInspectBootImage(cmd, args[0])
 		},
