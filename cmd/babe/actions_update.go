@@ -74,16 +74,22 @@ func runBabeSetup(w io.Writer, pm platform.PlatformManager, force, statusOnly bo
 }
 
 func runSelfUpdate(w io.Writer, force, checkOnly bool) error {
+	return runSelfUpdateWithRelease(w, nil, nil, force, checkOnly)
+}
+
+func runSelfUpdateWithRelease(w io.Writer, release *tools.GitHubRelease, asset *tools.GitHubAsset, force, checkOnly bool) error {
 	if w == nil {
 		w = os.Stdout
 	}
-	ui.Section("babe Self-Update")
-	fmt.Fprintln(w, "Checking for latest release on GitHub...")
+	if release == nil {
+		ui.Section("babe Self-Update")
+		fmt.Fprintln(w, "Checking for latest release on GitHub...")
+	}
 
 	var lastPct int64 = -1
 	var startedDownload bool
-	report, err := executeSelfUpdate(force, checkOnly, func(latest, asset string) {
-		fmt.Fprintf(w, "Updating babe %s -> %s (%s)...\n", version, latest, asset)
+	report, err := executeSelfUpdateWithRelease(release, asset, force, checkOnly, func(latest, assetName string) {
+		fmt.Fprintf(w, "Updating babe %s -> %s (%s)...\n", version, latest, assetName)
 	}, func(cur, tot int64) {
 		startedDownload = true
 		if tot > 0 {
@@ -140,6 +146,7 @@ func runSelfUpdateInteractive(reader *bufio.Reader) {
 		ui.Error("Failed to check for updates: %v", err)
 		return
 	}
+	tools.RecordLatestVersionCache(release.TagName)
 
 	asset, err := tools.FindAssetForPlatform(release, runtime.GOOS, runtime.GOARCH)
 	if err != nil {
@@ -166,7 +173,7 @@ func runSelfUpdateInteractive(reader *bufio.Reader) {
 		}
 	}
 
-	if err := runSelfUpdate(os.Stdout, force, false); err != nil {
+	if err := runSelfUpdateWithRelease(os.Stdout, release, asset, force, false); err != nil {
 		ui.Error("%v", err)
 	}
 }

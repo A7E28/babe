@@ -73,8 +73,107 @@ jobs:
         run: |
           sha256sum * > checksums.txt
 
-      - name: Create GitHub Release
+      - name: Generate and Validate latest.json
+        working-directory: release-artifacts
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import datetime
+          import hashlib
+          import json
+          import os
+          import re
+          import sys
+
+          tag = os.environ["TAG_NAME"]
+          if not tag:
+              sys.exit("TAG_NAME is empty")
+
+          checksums = {}
+          with open("checksums.txt", "r", encoding="utf-8") as f:
+              for line in f:
+                  line = line.strip()
+                  if not line:
+                      continue
+                  parts = line.split()
+                  if len(parts) >= 2:
+                      checksums[parts[1].lstrip("*").removeprefix("./")] = parts[0].lower()
+
+          platforms = [
+              ("windows-amd64", f"babe-{tag}-windows-amd64.exe"),
+              ("windows-arm64", f"babe-{tag}-windows-arm64.exe"),
+              ("linux-amd64", f"babe-{tag}-linux-amd64"),
+              ("linux-arm64", f"babe-{tag}-linux-arm64"),
+          ]
+
+          assets = {}
+          for key, filename in platforms:
+              if not os.path.isfile(filename):
+                  sys.exit(f"Missing binary artifact: {filename}")
+              sha = checksums.get(filename, "")
+              if not re.fullmatch(r"[0-9a-f]{64}", sha):
+                  sys.exit(f"Invalid or missing sha256 in checksums.txt for {filename}: {sha!r}")
+              assets[key] = {
+                  "name": filename,
+                  "url": f"https://github.com/A7E28/babe/releases/download/{tag}/{filename}",
+                  "sha256": sha,
+                  "size": os.path.getsize(filename),
+              }
+
+          manifest = {
+              "tag_name": tag,
+              "published_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "assets": assets,
+          }
+
+          with open("latest.json", "w", encoding="utf-8") as f:
+              json.dump(manifest, f, indent=2)
+              f.write("\n")
+
+          # Validate written latest.json
+          with open("latest.json", "r", encoding="utf-8") as f:
+              loaded = json.load(f)
+
+          if loaded.get("tag_name") != tag:
+              sys.exit(f"tag_name mismatch: {loaded.get('tag_name')!r} != {tag!r}")
+          if not loaded.get("published_at"):
+              sys.exit("published_at is empty")
+
+          loaded_assets = loaded.get("assets", {})
+          for key, filename in platforms:
+              entry = loaded_assets.get(key)
+              if not isinstance(entry, dict):
+                  sys.exit(f"Missing platform entry in latest.json: {key}")
+              if entry.get("name") != filename:
+                  sys.exit(f"Name mismatch for {key}: {entry.get('name')!r}")
+              expected_url = f"https://github.com/A7E28/babe/releases/download/{tag}/{filename}"
+              if entry.get("url") != expected_url:
+                  sys.exit(f"URL mismatch for {key}: {entry.get('url')!r}")
+              sha = entry.get("sha256", "")
+              if not re.fullmatch(r"[0-9a-f]{64}", sha) or sha != checksums.get(filename):
+                  sys.exit(f"SHA256 validation failed for {key}")
+              with open(filename, "rb") as bf:
+                  actual_sha = hashlib.sha256(bf.read()).hexdigest()
+              if sha != actual_sha:
+                  sys.exit(f"SHA256 content mismatch for {filename}: {sha} != {actual_sha}")
+              size = entry.get("size", 0)
+              if not isinstance(size, int) or size <= 0 or size != os.path.getsize(filename):
+                  sys.exit(f"Size validation failed for {key}: {size}")
+
+          print(f"Validated latest.json for {tag} ({len(loaded_assets)} platforms)")
+          PY
+
+      - name: Create Draft GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          draft: true
           files: release-artifacts/*
           generate_release_notes: true
+
+      - name: Publish GitHub Release Atomically
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          gh release edit "$TAG_NAME" --draft=false

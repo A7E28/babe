@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// receives the current bytes downloaded and the total content length.
+// ProgressFunc receives the current bytes downloaded and the total content length.
 type ProgressFunc func(current, total int64)
 
 type progressWriter struct {
@@ -27,16 +27,25 @@ func (pw *progressWriter) Write(p []byte) (int, error) {
 	return n, nil
 }
 
-// downloads a URL to destPath with real-time progress reporting and context cancellation.
-func DownloadFile(ctx context.Context, url, destPath string, onProgress ProgressFunc) (retErr error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+// DownloadFile downloads a URL to destPath
+func DownloadFile(ctx context.Context, url, destPath string, onProgress ProgressFunc) error {
+	client := &http.Client{
+		Timeout: 30 * time.Minute,
+	}
+	return DownloadFileWithClient(ctx, client, url, destPath, onProgress)
+}
+
+// DownloadFileWithClient downloads a URL to destPath using the supplied HTTP client.
+func DownloadFileWithClient(ctx context.Context, client *http.Client, rawURL, destPath string, onProgress ProgressFunc) error {
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Minute}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return fmt.Errorf("create download request: %w", err)
 	}
-
-	client := &http.Client{
-		Timeout: 30 * time.Minute, // Large file buffer timeout
-	}
+	req.Header.Set("User-Agent", "babe-cli")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -52,9 +61,10 @@ func DownloadFile(ctx context.Context, url, destPath string, onProgress Progress
 	if err != nil {
 		return fmt.Errorf("create destination file %s: %w", destPath, err)
 	}
+	closed := false
 	defer func() {
-		if cErr := out.Close(); cErr != nil && retErr == nil {
-			retErr = fmt.Errorf("close destination file %s: %w", destPath, cErr)
+		if !closed {
+			_ = out.Close()
 		}
 	}()
 
@@ -67,6 +77,14 @@ func DownloadFile(ctx context.Context, url, destPath string, onProgress Progress
 	if _, err := io.CopyBuffer(out, io.TeeReader(resp.Body, pw), buf); err != nil {
 		return fmt.Errorf("write stream to %s: %w", destPath, err)
 	}
+	if err := out.Sync(); err != nil {
+		return fmt.Errorf("sync destination file %s: %w", destPath, err)
+	}
+	if err := out.Close(); err != nil {
+		closed = true
+		return fmt.Errorf("close destination file %s: %w", destPath, err)
+	}
+	closed = true
 
 	return nil
 }

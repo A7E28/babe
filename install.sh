@@ -2,7 +2,7 @@
 set -e
 
 REPO="A7E28/babe"
-API_URL="https://api.github.com/repos/${REPO}/releases/latest"
+MANIFEST_URL="https://github.com/${REPO}/releases/latest/download/latest.json"
 INSTALL_DIR="${HOME}/.local/bin"
 TARGET_BIN="${INSTALL_DIR}/babe"
 
@@ -34,15 +34,15 @@ fetch_url() {
     dest="$2"
     if command -v curl >/dev/null 2>&1; then
         if [ -n "$dest" ]; then
-            curl -fsSL -H "User-Agent: babe-installer" "$url" -o "$dest"
+            curl -fsSL -H "User-Agent: babe-installer" -H "Accept: application/json" "$url" -o "$dest"
         else
-            curl -fsSL -H "User-Agent: babe-installer" "$url"
+            curl -fsSL -H "User-Agent: babe-installer" -H "Accept: application/json" "$url"
         fi
     elif command -v wget >/dev/null 2>&1; then
         if [ -n "$dest" ]; then
-            wget -q --header="User-Agent: babe-installer" -O "$dest" "$url"
+            wget -q --header="User-Agent: babe-installer" --header="Accept: application/json" -O "$dest" "$url"
         else
-            wget -q --header="User-Agent: babe-installer" -O - "$url"
+            wget -q --header="User-Agent: babe-installer" --header="Accept: application/json" -O - "$url"
         fi
     else
         echo "[ERROR] Neither curl nor wget is installed." >&2
@@ -62,10 +62,10 @@ compute_sha256() {
 }
 
 echo "--- babe Installer (linux/${ARCH}) ---"
-echo "[INFO] Querying latest release from GitHub..."
+echo "[INFO] Fetching latest release manifest from GitHub..."
 
-RELEASE_JSON="$(fetch_url "$API_URL" "")"
-TAG="$(printf '%s\n' "$RELEASE_JSON" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name":[[:space:]]*"([^"]+)".*/\1/')"
+MANIFEST_JSON="$(fetch_url "$MANIFEST_URL" "")"
+TAG="$(printf '%s\n' "$MANIFEST_JSON" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name":[[:space:]]*"([^"]+)".*/\1/')"
 
 if [ -z "$TAG" ]; then
     echo "[ERROR] Failed to resolve latest release tag from GitHub." >&2

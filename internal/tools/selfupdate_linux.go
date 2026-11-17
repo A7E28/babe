@@ -3,6 +3,7 @@
 package tools
 
 import (
+	"errors"
 	"fmt"
 	"os"
 )
@@ -13,7 +14,10 @@ func replaceExecutable(targetPath, newPath string) error {
 	}
 
 	if err := os.Rename(newPath, targetPath); err != nil {
-		return fmt.Errorf("failed to replace executable (check sudo privileges): %w", err)
+		if errors.Is(err, os.ErrPermission) {
+			return fmt.Errorf("permission denied replacing %s (re-run with sudo or install to ~/.local/bin via 'babe setup'): %w", targetPath, err)
+		}
+		return fmt.Errorf("failed to replace executable: %w", err)
 	}
 
 	return nil
