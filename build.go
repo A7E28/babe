@@ -51,7 +51,10 @@ func main() {
 	case "release":
 		_ = os.RemoveAll("dist")
 		buildTargets(targets, version, true)
-		generateChecksums()
+		if err := generateChecksums(); err != nil {
+			fmt.Printf("[ERROR] generate checksums failed: %v\n", err)
+			os.Exit(1)
+		}
 	case "windows", "win":
 		buildFilter("windows", version, false)
 	case "linux":
@@ -138,17 +141,16 @@ func executeBuild(t Target, outPath, version string, release bool) error {
 	return nil
 }
 
-func generateChecksums() {
+func generateChecksums() error {
 	files, err := os.ReadDir("dist")
 	if err != nil {
-		return
+		return err
 	}
 	checksumFile := filepath.Join("dist", "checksums.txt")
 	out, err := os.Create(checksumFile)
 	if err != nil {
-		return
+		return err
 	}
-	defer out.Close()
 
 	fmt.Println("\nGenerating SHA256 checksums:")
 	for _, f := range files {
@@ -156,10 +158,17 @@ func generateChecksums() {
 			continue
 		}
 		hash := calcSHA256(filepath.Join("dist", f.Name()))
-		_, _ = out.WriteString(fmt.Sprintf("%s  %s\n", hash, f.Name()))
+		if _, err := fmt.Fprintf(out, "%s  %s\n", hash, f.Name()); err != nil {
+			_ = out.Close()
+			return err
+		}
 		fmt.Printf("  %s...  %s\n", hash[:16], f.Name())
 	}
+	if err := out.Close(); err != nil {
+		return err
+	}
 	fmt.Printf("[OK] Saved checksums to %s\n", checksumFile)
+	return nil
 }
 
 func calcSHA256(path string) string {
