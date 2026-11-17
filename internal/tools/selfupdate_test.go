@@ -1,6 +1,8 @@
 package tools
 
 import (
+	"context"
+	"strings"
 	"testing"
 )
 
@@ -46,7 +48,7 @@ func TestFindAssetForPlatform(t *testing.T) {
 func TestParseChecksums(t *testing.T) {
 	content := `
 # Checksums for babe v0.2.0
-a6b752eb596c319b7587c6948f6d47868d2187acb0ccd6e5c8a441c3e67d5d39  babe-v0.2.0-linux-amd64
+a6b752eb596c319b7587c6948f6d47868d2187acb0ccd6e5c8a441c3e67d5d39  ./babe-v0.2.0-linux-amd64
 226d7a84ac11fffc7ebb7518eb2ba5be40fa4981646760cdae78d1a3f61184cd  babe-v0.2.0-linux-arm64
 ebedfb34a4fabaf8a3857e1a77360cc81a0c8f698c4b191b5e20bab7dd278ad8 *babe-v0.2.0-windows-amd64.exe
 ce8c47af65151d083ad6ac4b919631e522610274cf7765bccc315eb4ebdbf9a9  babe-v0.2.0-windows-arm64.exe
@@ -60,6 +62,37 @@ ce8c47af65151d083ad6ac4b919631e522610274cf7765bccc315eb4ebdbf9a9  babe-v0.2.0-wi
 	expected := "ebedfb34a4fabaf8a3857e1a77360cc81a0c8f698c4b191b5e20bab7dd278ad8"
 	if got := sums["babe-v0.2.0-windows-amd64.exe"]; got != expected {
 		t.Errorf("expected %s, got %s", expected, got)
+	}
+	if got := sums["babe-v0.2.0-linux-amd64"]; got != "a6b752eb596c319b7587c6948f6d47868d2187acb0ccd6e5c8a441c3e67d5d39" {
+		t.Errorf("expected ./ prefix to be normalized, got %q", got)
+	}
+
+	if got, ok := LookupChecksum(sums, "./BABE-V0.2.0-LINUX-AMD64"); !ok || got == "" {
+		t.Errorf("expected case-insensitive LookupChecksum match, got (%q, %v)", got, ok)
+	}
+	if _, ok := LookupChecksum(sums, "missing-asset"); ok {
+		t.Errorf("expected false for missing asset")
+	}
+}
+
+func TestApplyBabeUpdate_RejectsMissingOrMalformedChecksum(t *testing.T) {
+	asset := &GitHubAsset{
+		Name:               "babe-v0.2.0-linux-amd64",
+		BrowserDownloadURL: "http://127.0.0.1:0/nonexistent",
+	}
+
+	cases := []string{
+		"",
+		"   ",
+		"abc123",
+		strings.Repeat("z", 64),
+	}
+
+	for _, sha := range cases {
+		_, err := ApplyBabeUpdate(context.Background(), asset, sha, nil)
+		if err == nil {
+			t.Errorf("expected error for invalid expectedSHA256 %q, got nil", sha)
+		}
 	}
 }
 

@@ -69,7 +69,7 @@ func DownloadAndConfigurePlatformTools(ctx context.Context, customURL, expectedC
 		return "", fmt.Errorf("downloaded zip archive appears truncated or invalid")
 	}
 
-	if expectedChecksum != "" {
+	if strings.TrimSpace(expectedChecksum) != "" {
 		if err := verifyArchiveChecksum(zipFile, expectedChecksum); err != nil {
 			return "", err
 		}
@@ -111,7 +111,7 @@ func verifyArchiveChecksum(zipFile, expected string) error {
 	case 64:
 		algo = hash.SHA256
 	default:
-		return nil
+		return fmt.Errorf("unsupported checksum length %d (expected 40-char SHA-1 or 64-char SHA-256)", len(expected))
 	}
 
 	actual, err := hash.CalculateFileHash(zipFile, algo)
