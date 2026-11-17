@@ -4,8 +4,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+
 $Repo = "A7E28/babe"
-$ApiUrl = "https://api.github.com/repos/$Repo/releases/latest"
+$ManifestUrl = "https://github.com/$Repo/releases/latest/download/latest.json"
 
 $LocalAppData = $env:LOCALAPPDATA
 if ([string]::IsNullOrWhiteSpace($LocalAppData)) {
@@ -18,41 +20,60 @@ $Arch = "amd64"
 if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64" -or $env:PROCESSOR_ARCHITEW6432 -eq "ARM64") {
     $Arch = "arm64"
 }
+$PlatformKey = "windows-$Arch"
 
 Write-Host "--- babe Installer (windows/$Arch) ---" -ForegroundColor Cyan
 
-Write-Host "[INFO] Querying latest release from GitHub..."
-$Release = Invoke-RestMethod -Uri $ApiUrl -Headers @{ "User-Agent" = "babe-installer" }
-$Tag = $Release.tag_name
-$AssetName = "babe-$Tag-windows-$Arch.exe"
-
-$BinAsset = $Release.assets | Where-Object { $_.name -ieq $AssetName } | Select-Object -First 1
-if (-not $BinAsset) {
-    throw "No release asset found matching $AssetName in release $Tag"
+Write-Host "[INFO] Fetching latest release manifest from GitHub..."
+$Manifest = Invoke-RestMethod -Uri $ManifestUrl -Headers @{
+    "User-Agent" = "babe-installer"
+    "Accept"     = "application/json"
 }
 
-$ExpectedHash = ""
-$SumAsset = $Release.assets | Where-Object { $_.name -ieq "checksums.txt" } | Select-Object -First 1
-if ($SumAsset) {
-    $SumContent = Invoke-RestMethod -Uri $SumAsset.browser_download_url -Headers @{ "User-Agent" = "babe-installer" }
-    foreach ($Line in ($SumContent -split "`r?`n")) {
-        $Parts = $Line.Trim() -split "\s+"
-        if ($Parts.Count -ge 2) {
-            $FileName = $Parts[1].TrimStart('*')
-            if ($FileName -ieq $AssetName) {
-                $ExpectedHash = $Parts[0].ToLower()
-                break
-            }
-        }
-    }
+$Tag = "$($Manifest.tag_name)".Trim()
+if ([string]::IsNullOrWhiteSpace($Tag)) {
+    throw "Release manifest is missing tag_name"
+}
+
+$Asset = $Manifest.assets.$PlatformKey
+if (-not $Asset) {
+    throw "No release asset found for platform $PlatformKey in release $Tag"
+}
+
+$AssetName = "$($Asset.name)".Trim()
+$DownloadUrl = "$($Asset.url)".Trim()
+$ExpectedHash = "$($Asset.sha256)".Trim().ToLower()
+
+if ([string]::IsNullOrWhiteSpace($AssetName) -or [string]::IsNullOrWhiteSpace($DownloadUrl)) {
+    throw "Release manifest entry for $PlatformKey is incomplete"
+}
+
+$Uri = [System.Uri]$DownloadUrl
+$TrustedHost = (
+    $Uri.Scheme -eq "https" -and (
+        ($Uri.Host -ieq "github.com" -and $Uri.AbsolutePath.StartsWith("/$Repo/releases/download/")) -or
+        $Uri.Host -ieq "objects.githubusercontent.com" -or
+        $Uri.Host -ieq "release-assets.githubusercontent.com"
+    )
+)
+if (-not $TrustedHost) {
+    throw "Untrusted download URL in manifest: $DownloadUrl"
+}
+
+if ($ExpectedHash -notmatch '^[0-9a-f]{64}$') {
+    throw "Invalid or missing SHA-256 checksum in manifest for $AssetName"
 }
 
 if (-not (Test-Path $InstallDir)) {
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 }
 
+Get-ChildItem -Path $InstallDir -Filter "babe.exe*.old" -ErrorAction SilentlyContinue | ForEach-Object {
+    Remove-Item -Force $_.FullName -ErrorAction SilentlyContinue
+}
+
 $NeedDownload = $true
-if ((Test-Path $TargetExe) -and (-not $Force) -and ($ExpectedHash -ne "")) {
+if ((Test-Path $TargetExe) -and (-not $Force)) {
     $CurrentHash = (Get-FileHash -Path $TargetExe -Algorithm SHA256).Hash.ToLower()
     if ($CurrentHash -eq $ExpectedHash) {
         Write-Host "[OK] babe $Tag is already installed and up to date at:" -ForegroundColor Green
@@ -62,39 +83,50 @@ if ((Test-Path $TargetExe) -and (-not $Force) -and ($ExpectedHash -ne "")) {
 }
 
 if ($NeedDownload) {
-    $TempFile = Join-Path $InstallDir ".babe-install.tmp"
+    $TempFile = Join-Path $InstallDir ".babe-install-$PID.tmp"
     if (Test-Path $TempFile) {
         Remove-Item -Force $TempFile -ErrorAction SilentlyContinue
     }
 
-    Write-Host "[INFO] Downloading $AssetName ($Tag)..."
-    Invoke-WebRequest -Uri $BinAsset.browser_download_url -OutFile $TempFile -Headers @{ "User-Agent" = "babe-installer" }
+    try {
+        Write-Host "[INFO] Downloading $AssetName ($Tag)..."
+        Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempFile -UseBasicParsing -Headers @{ "User-Agent" = "babe-installer" }
 
-    if ($ExpectedHash -ne "") {
         $ActualHash = (Get-FileHash -Path $TempFile -Algorithm SHA256).Hash.ToLower()
         if ($ActualHash -ne $ExpectedHash) {
-            Remove-Item -Force $TempFile -ErrorAction SilentlyContinue
             throw "SHA256 checksum mismatch! Expected $ExpectedHash, got $ActualHash"
         }
         Write-Host "[OK] Verified SHA256: $ActualHash" -ForegroundColor Green
-    }
 
-    $OldFile = "$TargetExe.old"
-    if (Test-Path $OldFile) {
-        Remove-Item -Force $OldFile -ErrorAction SilentlyContinue
-    }
-    if (Test-Path $TargetExe) {
-        Move-Item -Force -Path $TargetExe -Destination $OldFile
-    }
-    Move-Item -Force -Path $TempFile -Destination $TargetExe
-    if (Test-Path $OldFile) {
-        Remove-Item -Force $OldFile -ErrorAction SilentlyContinue
-    }
+        $OldFile = "$TargetExe.$PID.old"
+        $MovedOld = $false
+        if (Test-Path $TargetExe) {
+            Move-Item -Force -Path $TargetExe -Destination $OldFile
+            $MovedOld = $true
+        }
+        try {
+            Move-Item -Force -Path $TempFile -Destination $TargetExe
+        }
+        catch {
+            if ($MovedOld -and (Test-Path $OldFile) -and (-not (Test-Path $TargetExe))) {
+                Move-Item -Force -Path $OldFile -Destination $TargetExe -ErrorAction SilentlyContinue
+            }
+            throw
+        }
+        if ($MovedOld) {
+            Remove-Item -Force $OldFile -ErrorAction SilentlyContinue
+        }
 
-    Write-Host "[OK] Installed babe $Tag to $TargetExe" -ForegroundColor Green
+        Write-Host "[OK] Installed babe $Tag to $TargetExe" -ForegroundColor Green
+    }
+    finally {
+        if (Test-Path $TempFile) {
+            Remove-Item -Force $TempFile -ErrorAction SilentlyContinue
+        }
+    }
 }
 
-# Register in HKCU\Environment\Path preserving REG_EXPAND_SZ
+# Register in HKCU\Environment\Path
 $RegKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Environment", $true)
 if ($null -eq $RegKey) {
     $RegKey = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey("Environment")
@@ -114,7 +146,8 @@ foreach ($Seg in ($RawPath -split ';')) {
 
 if ($AlreadyInReg) {
     Write-Host "[OK] User PATH already contains $InstallDir" -ForegroundColor Green
-} else {
+}
+else {
     $NewPath = if ([string]::IsNullOrWhiteSpace($RawPath)) { $InstallDir } else { "$RawPath;$InstallDir" }
     $RegKey.SetValue("Path", $NewPath, [Microsoft.Win32.RegistryValueKind]::ExpandString)
     Write-Host "[OK] Added $InstallDir to User PATH." -ForegroundColor Green

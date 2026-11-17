@@ -115,15 +115,26 @@ func executeToolsUpdate(client *device.Client, force, checkOnly bool, onWarn fun
 }
 
 func executeSelfUpdate(force, checkOnly bool, onStart func(latest, asset string), onProgress func(cur, tot int64)) (*updateReport, error) {
-	apiCtx, cancelAPI := context.WithTimeout(context.Background(), 20*time.Second)
-	release, err := tools.FetchLatestBabeRelease(apiCtx)
-	cancelAPI()
-	if err != nil {
-		return nil, fmt.Errorf("check for updates: %w", err)
+	return executeSelfUpdateWithRelease(nil, nil, force, checkOnly, onStart, onProgress)
+}
+
+func executeSelfUpdateWithRelease(release *tools.GitHubRelease, asset *tools.GitHubAsset, force, checkOnly bool, onStart func(latest, asset string), onProgress func(cur, tot int64)) (*updateReport, error) {
+	if release == nil {
+		apiCtx, cancelAPI := context.WithTimeout(context.Background(), 20*time.Second)
+		var err error
+		release, err = tools.FetchLatestBabeRelease(apiCtx)
+		cancelAPI()
+		if err != nil {
+			return nil, fmt.Errorf("check for updates: %w", err)
+		}
+		tools.RecordLatestVersionCache(release.TagName)
 	}
-	asset, err := tools.FindAssetForPlatform(release, runtime.GOOS, runtime.GOARCH)
-	if err != nil {
-		return nil, err
+	if asset == nil {
+		var err error
+		asset, err = tools.FindAssetForPlatform(release, runtime.GOOS, runtime.GOARCH)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	cmp := tools.CompareVersions(version, release.TagName)
@@ -142,15 +153,19 @@ func executeSelfUpdate(force, checkOnly bool, onStart func(latest, asset string)
 		onStart(release.TagName, asset.Name)
 	}
 
-	sumCtx, cancelSum := context.WithTimeout(context.Background(), 20*time.Second)
-	checksums, err := tools.FetchReleaseChecksums(sumCtx, release)
-	cancelSum()
-	if err != nil {
-		return nil, fmt.Errorf("fetch release checksums: %w", err)
-	}
-	expectedSHA, ok := tools.LookupChecksum(checksums, asset.Name)
-	if !ok || strings.TrimSpace(expectedSHA) == "" {
-		return nil, fmt.Errorf("release %s is missing SHA-256 checksum for %s", release.TagName, asset.Name)
+	expectedSHA := strings.TrimSpace(asset.SHA256)
+	if expectedSHA == "" {
+		sumCtx, cancelSum := context.WithTimeout(context.Background(), 20*time.Second)
+		checksums, err := tools.FetchReleaseChecksums(sumCtx, release)
+		cancelSum()
+		if err != nil {
+			return nil, fmt.Errorf("fetch release checksums: %w", err)
+		}
+		var ok bool
+		expectedSHA, ok = tools.LookupChecksum(checksums, asset.Name)
+		if !ok || strings.TrimSpace(expectedSHA) == "" {
+			return nil, fmt.Errorf("release %s is missing SHA-256 checksum for %s", release.TagName, asset.Name)
+		}
 	}
 	report.SHA256 = expectedSHA
 

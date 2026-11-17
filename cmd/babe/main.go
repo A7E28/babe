@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/A7E28/babe/internal/platform"
 )
@@ -10,8 +11,18 @@ import (
 var version = "dev"
 
 func cleanupOldBinary() {
-	if exePath, err := os.Executable(); err == nil {
-		_ = os.Remove(exePath + ".old")
+	exePath, err := os.Executable()
+	if err != nil {
+		return
+	}
+	if resolved, err := filepath.EvalSymlinks(exePath); err == nil {
+		exePath = resolved
+	}
+	_ = os.Remove(exePath + ".old")
+	if matches, err := filepath.Glob(exePath + ".*.old"); err == nil {
+		for _, m := range matches {
+			_ = os.Remove(m)
+		}
 	}
 }
 
@@ -20,7 +31,11 @@ func main() {
 	cleanupOldBinary()
 
 	if len(os.Args) > 1 {
-		if err := executeCLI(os.Args[1:]); err != nil {
+		args := os.Args[1:]
+		noticeHandle := startBackgroundUpdateCheck(args)
+		err := executeCLI(args)
+		finishBackgroundUpdateCheck(noticeHandle, err == nil, os.Stderr)
+		if err != nil {
 			os.Exit(1)
 		}
 		return
