@@ -53,7 +53,7 @@ func platformToolsMenu(client *device.Client, pm platform.PlatformManager, reade
 	}
 	switch input {
 	case "1":
-		if err := checkPlatformTools(os.Stdout, client, pm); err != nil {
+		if err := checkPlatformTools(client, pm); err != nil {
 			ui.Error("%v", err)
 			return
 		}
@@ -73,10 +73,7 @@ func platformToolsMenu(client *device.Client, pm platform.PlatformManager, reade
 	}
 }
 
-func checkPlatformTools(w io.Writer, client *device.Client, pm platform.PlatformManager) error {
-	if w == nil {
-		w = os.Stdout
-	}
+func checkPlatformTools(client *device.Client, pm platform.PlatformManager) error {
 	report, err := collectToolsStatus(client, pm)
 	if err != nil {
 		return err

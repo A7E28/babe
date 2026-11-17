@@ -18,7 +18,7 @@ func newToolsCmd(client *device.Client, pm platform.PlatformManager) *cobra.Comm
 			if isJSON(cmd) {
 				return handleToolsStatusJSON(cmd, client, pm)
 			}
-			if err := checkPlatformTools(cmd.OutOrStdout(), client, pm); err != nil {
+			if err := checkPlatformTools(client, pm); err != nil {
 				return err
 			}
 			return runBabeSetup(cmd.OutOrStdout(), pm, false, true)
@@ -34,7 +34,7 @@ func newToolsCmd(client *device.Client, pm platform.PlatformManager) *cobra.Comm
 			if isJSON(cmd) {
 				return handleToolsStatusJSON(cmd, client, pm)
 			}
-			if err := checkPlatformTools(cmd.OutOrStdout(), client, pm); err != nil {
+			if err := checkPlatformTools(client, pm); err != nil {
 				return err
 			}
 			return runBabeSetup(cmd.OutOrStdout(), pm, false, true)
