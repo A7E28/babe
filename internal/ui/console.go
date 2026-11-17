@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/A7E28/babe/internal/platform"
@@ -28,10 +29,18 @@ func Success(format string, args ...any) {
 	fmt.Printf("%s "+format+"\n", append([]any{tag}, args...)...)
 }
 
+// ErrorTo writes a standardized [ERROR] message to w.
+func ErrorTo(w io.Writer, format string, args ...any) {
+	if w == nil {
+		w = os.Stdout
+	}
+	tag := wrap(ansiBoldRed, "[ERROR]")
+	fmt.Fprintf(w, "%s "+format+"\n", append([]any{tag}, args...)...)
+}
+
 // prints a standardized [ERROR] message.
 func Error(format string, args ...any) {
-	tag := wrap(ansiBoldRed, "[ERROR]")
-	fmt.Printf("%s "+format+"\n", append([]any{tag}, args...)...)
+	ErrorTo(os.Stdout, format, args...)
 }
 
 // prints a standardized [INFO] message.

@@ -81,3 +81,12 @@ func TestRenderADBStatus(t *testing.T) {
 		t.Errorf("unexpected not installed output: %s", outNotInstalled)
 	}
 }
+
+func TestErrorTo(t *testing.T) {
+	var buf bytes.Buffer
+	ErrorTo(&buf, "failed %s: %d", "check", 42)
+	got := buf.String()
+	if !strings.Contains(got, "[ERROR]") || !strings.Contains(got, "failed check: 42") {
+		t.Errorf("unexpected ErrorTo output: %q", got)
+	}
+}
