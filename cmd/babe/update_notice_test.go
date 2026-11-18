@@ -58,7 +58,6 @@ func TestFinishBackgroundUpdateCheck(t *testing.T) {
 		t.Errorf("expected notice to be printed, got %q", buf.String())
 	}
 
-	// Failed command suppresses notice
 	ch2 := make(chan string, 1)
 	ch2 <- "Update available: v0.4.0 -> v0.5.0. Run 'babe update self' to update."
 	close(ch2)

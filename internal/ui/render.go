@@ -6,7 +6,6 @@ import (
 	"github.com/A7E28/babe/internal/device"
 )
 
-// displays the application banner with the active version.
 func RenderBanner(version string) {
 	ClearScreen()
 	Divider()
@@ -14,12 +13,10 @@ func RenderBanner(version string) {
 	Divider()
 }
 
-// formats a menu option line with subtle index accent.
 func RenderMenuItem(index int, title string) {
 	fmt.Printf("  %s  %s\n", Cyan(fmt.Sprintf("[%d]", index)), White(title))
 }
 
-// renders device telemetry and hardware properties.
 func RenderDeviceInfo(info *device.Info) {
 	fmt.Println()
 	fmt.Printf("  %s %s\n", Gray("Serial:         "), BoldCyan(info.Serial))
@@ -48,7 +45,6 @@ func RenderDeviceInfo(info *device.Info) {
 	fmt.Printf("  %s %s\n", Gray("Root Access:    "), rooted)
 }
 
-// renders formatted devices for selection.
 func RenderDeviceList(devices []device.Device) {
 	fmt.Printf("\n%s\n", Gray("Attached devices:"))
 	for i, d := range devices {
@@ -80,7 +76,6 @@ func formatDeviceState(st device.State) string {
 	}
 }
 
-// displays calculated cryptographic hashes.
 func RenderChecksums(filePath, md5Val, sha1Val, sha256Val string) {
 	fmt.Printf("\n  %s %s\n", Gray("File:  "), White(filePath))
 	fmt.Printf("  %s %s\n", Gray("MD5:   "), Cyan(md5Val))
@@ -88,7 +83,6 @@ func RenderChecksums(filePath, md5Val, sha1Val, sha256Val string) {
 	fmt.Printf("  %s %s\n", Gray("SHA256:"), Cyan(sha256Val))
 }
 
-// prints the current status of the platform-tools ADB binary.
 func RenderADBStatus(installed bool, version, binaryPath, defaultDir string, inPath bool) {
 	if installed {
 		Success("ADB detected on system PATH:")

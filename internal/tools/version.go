@@ -14,7 +14,6 @@ import (
 
 const repositoryXMLURL = "https://dl.google.com/android/repository/repository2-1.xml"
 
-// details the latest stable platform-tools release from Google.
 type RemoteRelease struct {
 	Version  string
 	ZipURL   string
@@ -58,7 +57,6 @@ type archiveComplete struct {
 	Size     int64  `xml:"size"`
 }
 
-// queries the Google Android SDK repository for the latest stable platform-tools release.
 func FetchLatestRelease(ctx context.Context) (*RemoteRelease, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, repositoryXMLURL, nil)
 	if err != nil {
@@ -138,8 +136,7 @@ func resolveTargetHostOS() string {
 	}
 }
 
-// compares two semantic version strings.
-// returns -1 if v1 < v2, 0 if v1 == v2, and 1 if v1 > v2.
+// CompareVersions returns -1 if v1 < v2, 0 if v1 == v2, and 1 if v1 > v2.
 func CompareVersions(v1, v2 string) int {
 	clean1 := cleanVersionString(v1)
 	clean2 := cleanVersionString(v2)

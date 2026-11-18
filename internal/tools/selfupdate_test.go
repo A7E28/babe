@@ -115,7 +115,6 @@ func TestSetupBabe_Idempotent(t *testing.T) {
 	tmpDir := t.TempDir()
 	pm := &mockPlatformManager{binDir: tmpDir, inPath: false}
 
-	// First run: should install binary and configure PATH
 	res1, err := SetupBabe(pm, false)
 	if err != nil {
 		t.Fatalf("first SetupBabe failed: %v", err)
@@ -127,7 +126,6 @@ func TestSetupBabe_Idempotent(t *testing.T) {
 		t.Errorf("expected first run to configure PATH, got %+v", res1)
 	}
 
-	// Second run: should detect binary is already up-to-date and in PATH
 	res2, err := SetupBabe(pm, false)
 	if err != nil {
 		t.Fatalf("second SetupBabe failed: %v", err)
@@ -139,7 +137,6 @@ func TestSetupBabe_Idempotent(t *testing.T) {
 		t.Errorf("expected second run to detect PathAlreadySet, got %+v", res2)
 	}
 
-	// Third run with force=true: should overwrite binary
 	res3, err := SetupBabe(pm, true)
 	if err != nil {
 		t.Fatalf("forced SetupBabe failed: %v", err)

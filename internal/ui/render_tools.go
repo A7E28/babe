@@ -10,7 +10,6 @@ import (
 	"github.com/A7E28/babe/internal/image"
 )
 
-// renders the diagnostic check suite results.
 func RenderDoctorResults(results []doctor.CheckResult) {
 	fmt.Println()
 	for _, r := range results {
@@ -28,7 +27,6 @@ func RenderDoctorResults(results []doctor.CheckResult) {
 	}
 }
 
-// renders static analysis metadata for an APK or Split APK bundle.
 func RenderArchiveInfo(info *apk.ArchiveInfo, showAllPerms bool) {
 	fmt.Println()
 	fmt.Printf("  %s %s %s\n", Gray("File:           "), White(info.FilePath), Gray(fmt.Sprintf("(%d KB)", info.FileSize/1024)))
@@ -79,7 +77,6 @@ func RenderArchiveInfo(info *apk.ArchiveInfo, showAllPerms bool) {
 	}
 }
 
-// renders parsed Android boot.img or init_boot.img header telemetry.
 func RenderBootImageInfo(info *image.BootImageInfo) {
 	fmt.Println()
 	fmt.Printf("  %s %s %s\n", Gray("Image File:     "), White(info.FilePath), Gray(fmt.Sprintf("(%d KB)", info.FileSize/1024)))
@@ -101,7 +98,6 @@ func RenderBootImageInfo(info *image.BootImageInfo) {
 	}
 }
 
-// renders attached Fastboot/Bootloader devices.
 func RenderFastbootDevices(devices []fastboot.Device) {
 	fmt.Printf("\n%s\n", Gray("Fastboot devices:"))
 	for i, d := range devices {
@@ -113,7 +109,6 @@ func RenderFastbootDevices(devices []fastboot.Device) {
 	}
 }
 
-// renders bootloader variables for a Fastboot device.
 func RenderFastbootInfo(info *fastboot.DeviceInfo) {
 	fmt.Println()
 	fmt.Printf("  %s %s\n", Gray("Serial:         "), BoldCyan(info.Serial))

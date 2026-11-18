@@ -12,7 +12,6 @@ import (
 
 var ErrZipSlip = errors.New("zip file contains illegal relative path (ZipSlip vulnerability)")
 
-// unpacks a zip archive into destDir with path sanitization and permission preservation.
 func ExtractZip(zipPath, destDir string) error {
 	reader, err := zip.OpenReader(zipPath)
 	if err != nil {

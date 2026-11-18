@@ -11,14 +11,12 @@ import (
 	"github.com/A7E28/babe/internal/device"
 )
 
-// InstallOptions contains options for APK installation.
 type InstallOptions struct {
 	Reinstall bool // -r
 	Downgrade bool // -d
 	GrantPerm bool // -g
 }
 
-// Install installs an APK file onto the targeted Android device.
 func Install(ctx context.Context, client *device.Client, serial, apkPath string, opts InstallOptions) error {
 	args := []string{"install"}
 	if opts.Reinstall {
@@ -44,7 +42,6 @@ func Install(ctx context.Context, client *device.Client, serial, apkPath string,
 	return nil
 }
 
-// ListPackages returns the installed packages on the device.
 func ListPackages(ctx context.Context, client *device.Client, serial string, thirdPartyOnly bool) ([]string, error) {
 	args := []string{"shell", "pm", "list", "packages"}
 	if thirdPartyOnly {
@@ -59,7 +56,6 @@ func ListPackages(ctx context.Context, client *device.Client, serial string, thi
 	return ParsePackageList(out), nil
 }
 
-// ParsePackageList extracts package names from `pm list packages` output.
 func ParsePackageList(out string) []string {
 	var packages []string
 	for _, line := range strings.Split(out, "\n") {
@@ -74,8 +70,7 @@ func ParsePackageList(out string) []string {
 	return packages
 }
 
-// PullPackage extracts an installed package from the device into destDir.
-// Standard single-APK apps are saved as <package>.apk; Split APK apps are bundled into <package>.apks.
+// PullPackage saves single-APK apps as <package>.apk and bundles split APKs into <package>.apks.
 func PullPackage(ctx context.Context, client *device.Client, serial, packageName, destDir string) (string, error) {
 	out, err := client.ExecuteOnDevice(ctx, serial, "shell", "pm", "path", packageName)
 	if err != nil {
@@ -129,7 +124,6 @@ func PullPackage(ctx context.Context, client *device.Client, serial, packageName
 	return bundleFile, nil
 }
 
-// ParsePackagePaths extracts all APK device paths from `pm path <pkg>` output.
 func ParsePackagePaths(out string) []string {
 	var paths []string
 	for _, line := range strings.Split(out, "\n") {
@@ -144,7 +138,6 @@ func ParsePackagePaths(out string) []string {
 	return paths
 }
 
-// ParsePackagePath extracts the primary APK device path from `pm path <pkg>` output.
 func ParsePackagePath(out string) string {
 	paths := ParsePackagePaths(out)
 	if len(paths) > 0 {

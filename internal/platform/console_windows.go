@@ -29,7 +29,6 @@ func initConsolePlatform() error {
 func clearConsolePlatform() {
 	fmt.Print("\x1b[2J\x1b[3J\x1b[H")
 
-	// 2. Fallback sweep for legacy Win32 console buffer
 	handle := windows.Handle(os.Stdout.Fd())
 	var csbi windows.ConsoleScreenBufferInfo
 	if err := windows.GetConsoleScreenBufferInfo(handle, &csbi); err == nil {

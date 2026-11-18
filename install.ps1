@@ -126,7 +126,6 @@ if ($NeedDownload) {
     }
 }
 
-# Register in HKCU\Environment\Path
 $RegKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Environment", $true)
 if ($null -eq $RegKey) {
     $RegKey = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey("Environment")
@@ -154,7 +153,6 @@ else {
 }
 $RegKey.Close()
 
-# Ensure active session PATH includes InstallDir immediately
 $InSessionPath = $false
 foreach ($Seg in ($env:PATH -split ';')) {
     if ($Seg.Trim().TrimEnd('\', '/') -ieq $NormTarget) {

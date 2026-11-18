@@ -5,7 +5,6 @@ import (
 	"strings"
 )
 
-// defines the cross-platform operations for system path and UI dialogs.
 type PlatformManager interface {
 	GetDefaultInstallDir() (string, error)
 	GetBabeBinDir() (string, error)
@@ -15,12 +14,10 @@ type PlatformManager interface {
 	OpenFilePicker(title string) (string, error)
 }
 
-// returns the OS-specific implementation of PlatformManager.
 func DefaultManager() PlatformManager {
 	return defaultManager()
 }
 
-// splits a PATH environment string by delimiter and cleans whitespace.
 func CleanPathString(pathStr string, delimiter rune) []string {
 	parts := strings.Split(pathStr, string(delimiter))
 	var cleaned []string
@@ -33,12 +30,10 @@ func CleanPathString(pathStr string, delimiter rune) []string {
 	return cleaned
 }
 
-// FormatPathString joins path segments with the given delimiter.
 func FormatPathString(segments []string, delimiter rune) string {
 	return strings.Join(segments, string(delimiter))
 }
 
-// AppendPathSegment normalizes trailing delimiters on currentPath before appending dir.
 func AppendPathSegment(currentPath, dir string, delimiter rune) string {
 	delimStr := string(delimiter)
 	cleanCurrent := strings.TrimRight(strings.TrimSpace(currentPath), delimStr)
@@ -60,7 +55,6 @@ func normalizePathForCompare(p string) string {
 	return trimmed
 }
 
-// checks if a path list contains a directory (case-insensitive on Windows).
 func ContainsPath(list []string, target string, caseInsensitive bool) bool {
 	normTarget := normalizePathForCompare(target)
 	for _, p := range list {
@@ -78,7 +72,6 @@ func ContainsPath(list []string, target string, caseInsensitive bool) bool {
 	return false
 }
 
-// removes a target directory from a slice of paths.
 func FilterOutPath(list []string, target string, caseInsensitive bool) []string {
 	normTarget := normalizePathForCompare(target)
 	var result []string

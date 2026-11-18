@@ -41,31 +41,26 @@ func newRootCmd(adbClient *device.Client, fbClient *fastboot.Client, pm platform
 	rootCmd.PersistentFlags().BoolVar(&jsonOut, "json", false, "Output results as machine-readable JSON")
 	rootCmd.Flags().BoolVar(&showVersion, "version", false, "Print babe version")
 
-	// Command Groups
 	rootCmd.AddGroup(
 		&cobra.Group{ID: "core", Title: "Core Commands:"},
 		&cobra.Group{ID: "device", Title: "Device & Fastboot Commands:"},
 		&cobra.Group{ID: "pkg", Title: "Package, Image & Diagnostic Commands:"},
 	)
 
-	// Register Core Commands
 	rootCmd.AddCommand(newDoctorCmd(adbClient, fbClient, pm))
 	rootCmd.AddCommand(newToolsCmd(adbClient, pm))
 	rootCmd.AddCommand(newUpdateCmd(adbClient, pm))
 	rootCmd.AddCommand(newSetupCmd(pm))
 
-	// Register Device & Fastboot Commands
 	rootCmd.AddCommand(newDeviceCmd(adbClient))
 	rootCmd.AddCommand(newFastbootCmd(fbClient))
 
-	// Register Package, Image & Diagnostic Commands
 	rootCmd.AddCommand(newAPKCmd(adbClient))
 	rootCmd.AddCommand(newImageCmd())
 	rootCmd.AddCommand(newLogcatCmd(adbClient))
 	rootCmd.AddCommand(newHashCmd())
 	rootCmd.AddCommand(newUdevCmd())
 
-	// Version Command
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print babe version",
@@ -79,7 +74,6 @@ func newRootCmd(adbClient *device.Client, fbClient *fastboot.Client, pm platform
 		},
 	})
 
-	// Top-level shortcuts / aliases for parity
 	rootCmd.AddCommand(newDevicesAliasCmd(adbClient))
 	rootCmd.AddCommand(newInfoAliasCmd(adbClient))
 	rootCmd.AddCommand(newRebootAliasCmd(adbClient))

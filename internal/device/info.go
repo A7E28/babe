@@ -16,7 +16,6 @@ var (
 	ErrDeviceNotFound     = errors.New("target ADB device not found")
 )
 
-// Info holds parsed device telemetry and hardware information.
 type Info struct {
 	Serial          string `json:"serial"`
 	Model           string `json:"model,omitempty"`
@@ -32,7 +31,6 @@ type Info struct {
 	IsRooted        bool   `json:"is_rooted"`
 }
 
-// ValidateDeviceState checks if an attached device is ready to accept ADB commands.
 func ValidateDeviceState(d Device) error {
 	switch d.State {
 	case StateDevice:
@@ -46,7 +44,6 @@ func ValidateDeviceState(d Device) error {
 	}
 }
 
-// GetDeviceInfo queries a device for comprehensive hardware and OS properties.
 func (c *Client) GetDeviceInfo(ctx context.Context, serial string) (*Info, error) {
 	info := &Info{Serial: serial}
 
@@ -124,7 +121,6 @@ const (
 	RebootEDL        RebootTarget = "edl"
 )
 
-// Reboot triggers a system or special mode restart on the device.
 func (c *Client) Reboot(ctx context.Context, serial string, target RebootTarget) error {
 	args := []string{"reboot"}
 	if target != RebootSystem {

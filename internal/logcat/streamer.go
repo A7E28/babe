@@ -11,7 +11,6 @@ import (
 	"strings"
 )
 
-// StreamOptions configures the logcat streaming session.
 type StreamOptions struct {
 	ADBBinary   string
 	Serial      string
@@ -37,7 +36,6 @@ func isDigitsOnly(s string) bool {
 	return true
 }
 
-// Stream connects to `adb logcat`, streams entries in real-time, and terminates cleanly when ctx is cancelled.
 func Stream(ctx context.Context, opts StreamOptions, handler LineHandler) error {
 	adbBin := opts.ADBBinary
 	if adbBin == "" {
@@ -84,7 +82,6 @@ func Stream(ctx context.Context, opts StreamOptions, handler LineHandler) error 
 	return err
 }
 
-// DumpCrashLogs dumps the device's crash ring buffer (`logcat -b crash -v time -d`) and exits immediately.
 func DumpCrashLogs(ctx context.Context, adbBinary, serial, outputFile string, handler LineHandler) (int, error) {
 	if adbBinary == "" {
 		adbBinary = "adb"

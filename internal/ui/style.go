@@ -32,47 +32,38 @@ func wrap(code, s string) string {
 	return fmt.Sprintf("%s%s%s", code, s, ansiReset)
 }
 
-// returns text styled in bold.
 func Bold(s string) string {
 	return wrap(ansiBold, s)
 }
 
-// returns text styled with dimmed/faded intensity.
 func Dim(s string) string {
 	return wrap(ansiDim, s)
 }
 
-// returns text in muted dark gray.
 func Gray(s string) string {
 	return wrap(ansiGray, s)
 }
 
-// returns text in standard cyan.
 func Cyan(s string) string {
 	return wrap(ansiCyan, s)
 }
 
-// returns text in bold cyan.
 func BoldCyan(s string) string {
 	return wrap(ansiBoldCyan, s)
 }
 
-// returns text in standard green.
 func Green(s string) string {
 	return wrap(ansiGreen, s)
 }
 
-// returns text in warning amber/yellow.
 func Yellow(s string) string {
 	return wrap(ansiYellow, s)
 }
 
-// returns text in error red.
 func Red(s string) string {
 	return wrap(ansiRed, s)
 }
 
-// returns text in bright white.
 func White(s string) string {
 	return wrap(ansiBoldWhite, s)
 }

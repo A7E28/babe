@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/A7E28/babe/internal/device"
+	"github.com/A7E28/babe/internal/image"
 )
 
 func captureOutput(f func()) string {
@@ -88,5 +89,144 @@ func TestErrorTo(t *testing.T) {
 	got := buf.String()
 	if !strings.Contains(got, "[ERROR]") || !strings.Contains(got, "failed check: 42") {
 		t.Errorf("unexpected ErrorTo output: %q", got)
+	}
+}
+
+func TestRenderPayload_SanitizationAndEmptyBootInfo(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	var buf bytes.Buffer
+	RenderPayloadInfoTo(&buf, &image.PayloadInfo{
+		FilePath:   "ota\x1b[31m.zip",
+		SourceType: "zip",
+		OTAType:    "full",
+		BlockSize:  4096,
+		Partitions: []image.PayloadPartition{{
+			Name:        "boot\x1b[2J",
+			Size:        4096,
+			Codecs:      []string{"xz"},
+			Extractable: true,
+		}},
+	})
+	infoOut := buf.String()
+	if strings.Contains(infoOut, "\x1b") {
+		t.Errorf("expected ANSI escapes stripped from payload info output, got %q", infoOut)
+	}
+	if !strings.Contains(infoOut, "boot[2J") {
+		t.Errorf("expected sanitized partition name, got %q", infoOut)
+	}
+
+	buf.Reset()
+	RenderPayloadExtractResultTo(&buf, &image.PayloadExtractResult{
+		SourceType: "zip",
+		Jobs:       1,
+		Extracted: []image.PayloadExtractItem{{
+			Partition:  "boot",
+			OutputPath: "boot.img",
+			Size:       4096,
+			Verified:   false,
+			BootInfo:   &image.BootImageInfo{HeaderVersion: 4},
+		}},
+	})
+	extOut := buf.String()
+	if strings.Contains(extOut, "(OS , Patch )") || strings.Contains(extOut, "SHA256:") {
+		t.Errorf("unexpected empty OS/Patch or blank SHA256 in output: %q", extOut)
+	}
+	if !strings.Contains(extOut, "Boot Header: v4") {
+		t.Errorf("expected 'Boot Header: v4', got %q", extOut)
+	}
+}
+
+func TestRenderPayloadInfo_DynamicColumnsDeltaAndOverflow(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	var buf bytes.Buffer
+	RenderPayloadInfoTo(&buf, &image.PayloadInfo{
+		FilePath:   "ota.zip",
+		SourceType: "zip",
+		OTAType:    "delta",
+		BlockSize:  4096,
+		TotalSize:  ^uint64(0),
+		Partitions: []image.PayloadPartition{
+			{
+				Name:        "vendor_kernel_boot_a",
+				Size:        1024 * 1024,
+				Codecs:      []string{"xz"},
+				Extractable: true,
+			},
+			{
+				Name:              "system",
+				Size:              2 * 1024 * 1024,
+				Codecs:            []string{"zstd"},
+				Extractable:       false,
+				UnsupportedReason: "requires source blocks\x1b[31m (SOURCE_COPY)",
+			},
+		},
+	})
+	out := buf.String()
+	if !strings.Contains(out, "(size overflow)") || strings.Contains(out, "17592186044416.00") {
+		t.Errorf("expected size overflow marker, got %q", out)
+	}
+	if strings.Contains(out, "\x1b") {
+		t.Errorf("expected ANSI escapes stripped, got %q", out)
+	}
+	if !strings.Contains(out, "[DELTA] requires source blocks[31m (SOURCE_COPY)") {
+		t.Errorf("expected sanitized DELTA reason, got %q", out)
+	}
+
+	var header, row1, row2 string
+	for _, line := range strings.Split(out, "\n") {
+		switch {
+		case strings.Contains(line, "NAME") && strings.Contains(line, "STATUS"):
+			header = line
+		case strings.Contains(line, "vendor_kernel_boot_a"):
+			row1 = line
+		case strings.Contains(line, "system"):
+			row2 = line
+		}
+	}
+	if header == "" || row1 == "" || row2 == "" {
+		t.Fatalf("missing table lines in output:\n%s", out)
+	}
+	if strings.Index(header, "CODECS") != strings.Index(row1, "xz") || strings.Index(header, "CODECS") != strings.Index(row2, "zstd") {
+		t.Errorf("CODECS column misaligned:\n%s\n%s\n%s", header, row1, row2)
+	}
+	if strings.Index(header, "STATUS") != strings.Index(row1, "[OK]") || strings.Index(header, "STATUS") != strings.Index(row2, "[DELTA]") {
+		t.Errorf("STATUS column misaligned:\n%s\n%s\n%s", header, row1, row2)
+	}
+}
+
+func TestRenderPayloadExtractResult_PartialBootInfo(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	var buf bytes.Buffer
+	RenderPayloadExtractResultTo(&buf, &image.PayloadExtractResult{
+		SourceType: "zip",
+		Jobs:       1,
+		Extracted: []image.PayloadExtractItem{{
+			Partition:  "boot",
+			OutputPath: "boot.img",
+			Size:       4096,
+			Verified:   true,
+			BootInfo:   &image.BootImageInfo{HeaderVersion: 4, OSVersion: "14"},
+		}},
+	})
+	osOnly := buf.String()
+	if !strings.Contains(osOnly, "Boot Header: v4 (OS 14)") || strings.Contains(osOnly, "Patch") {
+		t.Errorf("unexpected OS-only Boot Header output: %q", osOnly)
+	}
+
+	buf.Reset()
+	RenderPayloadExtractResultTo(&buf, &image.PayloadExtractResult{
+		SourceType: "zip",
+		Jobs:       1,
+		Extracted: []image.PayloadExtractItem{{
+			Partition:  "init_boot",
+			OutputPath: "init_boot.img",
+			Size:       4096,
+			Verified:   true,
+			BootInfo:   &image.BootImageInfo{HeaderVersion: 3, OSPatchLevel: "2026-05"},
+		}},
+	})
+	patchOnly := buf.String()
+	if !strings.Contains(patchOnly, "Boot Header: v3 (Patch 2026-05)") || strings.Contains(patchOnly, "OS ") {
+		t.Errorf("unexpected Patch-only Boot Header output: %q", patchOnly)
 	}
 }

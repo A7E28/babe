@@ -83,8 +83,8 @@ func buildSyntheticAXML() []byte {
 		{4, 5, 0x03, 5},           // versionName="1.2.3"
 	})
 	usesSDKElem := writeElem(6, [][4]uint32{
-		{7, 8, 0x03, 8},   // minSdkVersion="34" stored as string reference at pool index 8
-		{9, 10, 0x03, 10}, // targetSdkVersion="VanillaIceCream" stored as string reference at pool index 10
+		{7, 8, 0x03, 8},   // minSdkVersion="34" (string ref)
+		{9, 10, 0x03, 10}, // targetSdkVersion="VanillaIceCream" (string ref)
 	})
 
 	totalSize := uint32(8 + poolChunk.Len() + len(manifestElem) + len(usesSDKElem))

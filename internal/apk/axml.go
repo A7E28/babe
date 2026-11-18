@@ -12,7 +12,6 @@ const (
 	resXMLStartElType = 0x0102
 )
 
-// ParseAXMLManifest extracts package, version, SDK, and permission attributes from binary AndroidManifest.xml.
 func ParseAXMLManifest(data []byte, info *ArchiveInfo) {
 	if len(data) < 8 || binary.LittleEndian.Uint16(data[0:2]) != 0x0003 {
 		return

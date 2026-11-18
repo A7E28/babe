@@ -9,7 +9,6 @@ import (
 	"os/exec"
 )
 
-// indicates that Linux udev rule installation is not applicable on the current OS.
 var ErrUdevUnsupported = errors.New("udev rules are only applicable on Linux systems")
 
 const androidUdevRules = `# Android USB device rules for non-root ADB access
@@ -31,8 +30,6 @@ SUBSYSTEM=="usb", ATTR{idVendor}=="2e04", MODE="0666", GROUP="plugdev" # Nothing
 SUBSYSTEM=="usb", ATTR{idVendor}=="0b05", MODE="0666", GROUP="plugdev" # ASUS
 `
 
-// writes Android device udev rules to /etc/udev/rules.d/51-android.rules
-// and triggers udev reload. Requires root / sudo.
 func InstallUdevRules() error {
 	rulesPath := "/etc/udev/rules.d/51-android.rules"
 

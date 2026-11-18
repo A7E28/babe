@@ -16,7 +16,6 @@ const (
 	ColorBoldRed = "\x1b[1;31m"
 )
 
-// returns the ANSI escape code for a given log level.
 func LevelColor(lvl Level) string {
 	switch lvl {
 	case LevelVerbose:
@@ -36,7 +35,6 @@ func LevelColor(lvl Level) string {
 	}
 }
 
-// returns a formatted string for an entry, applying ANSI colors when supported.
 func Colorize(entry Entry) string {
 	useColor := platform.ColorsSupported()
 
